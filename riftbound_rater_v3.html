@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Riftbound · 单卡评级</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold:#c9a84c;--gold-light:#e8cf7e;--gold-dark:#8a6d2a;
+  --bg:#080a0f;--bg-card:#0e1118;--bg-panel:#12151d;
+  --bg-input:#181c26;--border:#252b38;--border-hi:#3a4255;
+  --text:#cdc8be;--text-dim:#5a6275;--text-mid:#8e96a8;
+  --s-bg:#c0392b;--a-bg:#d4820a;--b-bg:#1e8449;--c-bg:#1a6fa8;--d-bg:#3d4455;
+  --s-fg:#fff;--a-fg:#fff;--b-fg:#fff;--c-fg:#fff;--d-fg:#9aa;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC',sans-serif;min-height:100vh;user-select:none;}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse 80% 30% at 50% 0%,rgba(201,168,76,.06) 0%,transparent 55%),
+  radial-gradient(ellipse 35% 55% at 2% 55%,rgba(91,159,224,.04) 0%,transparent 50%),
+  radial-gradient(ellipse 35% 55% at 98% 55%,rgba(192,57,43,.04) 0%,transparent 50%);
+  pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;}
+
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;
+  border-bottom:1px solid var(--border);background:var(--bg-panel);flex-shrink:0;gap:8px;flex-wrap:wrap;}
+.logo{font-family:'Cinzel',serif;font-size:15px;font-weight:700;letter-spacing:.18em;
+  color:var(--gold-light);text-shadow:0 0 28px rgba(201,168,76,.4);white-space:nowrap;}
+.logo small{display:block;font-size:10px;letter-spacing:.22em;color:var(--text-dim);font-weight:400;margin-top:2px;}
+.header-center{display:flex;align-items:center;gap:6px;}
+.user-toggle{display:flex;border:1px solid var(--border-hi);border-radius:5px;overflow:hidden;flex-shrink:0;}
+.user-btn{padding:5px 13px;font-size:12px;cursor:pointer;background:transparent;
+  border:none;color:var(--text-dim);transition:all .15s;font-family:'Noto Sans SC',sans-serif;white-space:nowrap;}
+.user-btn.active{background:var(--gold-dark);color:#07090e;font-weight:700;}
+.user-btn:hover:not(.active){background:var(--bg-input);color:var(--text);}
+.header-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.sync-pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:14px;
+  border:1px solid var(--border-hi);background:var(--bg-input);font-size:11px;color:var(--text-dim);white-space:nowrap;}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim);transition:all .3s;}
+.sync-dot.live{background:#7ecba1;box-shadow:0 0 5px #7ecba1;}
+.sync-dot.syncing{background:var(--gold);animation:blink 1s infinite;}
+.sync-dot.err{background:#d05555;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.btn{padding:5px 11px;border-radius:4px;font-family:'Noto Sans SC',sans-serif;font-size:12px;
+  font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;}
+.btn-gold{background:linear-gradient(135deg,var(--gold-dark),var(--gold));color:#07090e;font-weight:700;}
+.btn-gold:hover{filter:brightness(1.12);}
+.btn-ghost{background:transparent;border:1px solid var(--border-hi);color:var(--text-mid);}
+.btn-ghost:hover{border-color:var(--gold-dark);color:var(--gold);}
+.btn-danger{background:transparent;border:1px solid #4a2020;color:#8a4444;}
+.btn-danger:hover{border-color:#a05050;color:#d07070;}
+.btn-sm{padding:4px 9px;font-size:11px;}
+
+/* ── Tabs ── */
+.tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg-panel);
+  flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+.tab-bar::-webkit-scrollbar{display:none;}
+.tab{padding:10px 17px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-dim);
+  border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;
+  display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--text-mid);}
+.tab.active{color:var(--text);border-bottom-color:var(--ta,var(--gold));}
+.tab-pip{width:7px;height:7px;border-radius:50%;background:var(--ta,var(--gold));opacity:.5;}
+.tab.active .tab-pip{opacity:1;box-shadow:0 0 5px var(--ta,var(--gold));}
+.tab-n{font-size:10px;font-weight:700;background:var(--bg-input);color:var(--text-dim);
+  padding:1px 5px;border-radius:10px;min-width:18px;text-align:center;}
+.tab-prog{font-size:9px;color:#7ecba1;font-weight:600;}
+
+/* ── Layout ── */
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* ── Sidebar ── */
+.sidebar{width:220px;flex-shrink:0;border-right:1px solid var(--border);
+  background:var(--bg-panel);display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:thin;}
+.sb-sec{padding:11px 13px;border-bottom:1px solid var(--border);}
+.sb-title{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.22em;
+  color:var(--gold-dark);text-transform:uppercase;margin-bottom:7px;}
+
+/* Add form */
+.add-form{display:flex;flex-direction:column;gap:5px;}
+.url-row{display:flex;gap:4px;}
+.url-row input{flex:1;min-width:0;}
+.add-form input{background:var(--bg-input);border:1px solid var(--border);border-radius:4px;
+  color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:12px;padding:6px 8px;
+  outline:none;width:100%;transition:border-color .2s;}
+.add-form input:focus{border-color:var(--gold-dark);}
+.add-form input::placeholder{color:var(--text-dim);}
+.ocr-btn{flex-shrink:0;padding:5px 8px;background:var(--bg-input);border:1px solid var(--border-hi);
+  border-radius:4px;color:var(--text-dim);font-size:11px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.ocr-btn:hover{border-color:var(--gold-dark);color:var(--gold);}
+.ocr-btn.loading{color:var(--gold);border-color:var(--gold-dark);animation:blink .7s infinite;}
+.ocr-status{font-size:10px;color:var(--text-dim);min-height:13px;}
+
+/* Progress */
+.prog-wrap{padding:10px 13px;border-bottom:1px solid var(--border);}
+.prog-hd{display:flex;justify-content:space-between;font-size:10px;margin-bottom:5px;}
+.prog-hd span:first-child{color:var(--text-dim);}
+.prog-hd span:last-child{color:var(--gold);font-weight:600;}
+.prog-bar{height:3px;background:var(--border);border-radius:2px;}
+.prog-fill{height:3px;background:linear-gradient(90deg,var(--gold-dark),var(--gold));
+  border-radius:2px;transition:width .5s;}
+
+/* Legend */
+.legend{display:flex;flex-direction:column;gap:5px;padding:10px 13px;border-bottom:1px solid var(--border);}
+.leg-row{display:flex;align-items:flex-start;gap:7px;}
+.leg-badge{width:22px;height:22px;border-radius:3px;flex-shrink:0;display:flex;align-items:center;
+  justify-content:center;font-family:'Cinzel',serif;font-size:10px;font-weight:700;margin-top:1px;}
+.leg-text{font-size:10px;color:var(--text-dim);line-height:1.5;}
+.leg-text b{color:var(--text-mid);font-weight:500;display:block;}
+
+/* Stats */
+.sb-stats{padding:10px 13px;flex:1;}
+.st-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.st-left{display:flex;align-items:center;gap:6px;}
+.st-badge{width:18px;height:18px;border-radius:3px;display:flex;align-items:center;
+  justify-content:center;font-family:'Cinzel',serif;font-size:9px;font-weight:700;}
+.st-desc{font-size:10px;color:var(--text-dim);}
+.st-num{font-size:14px;font-weight:700;}
+.bar-wrap{margin-bottom:7px;height:2px;background:var(--border);border-radius:1px;}
+.bar-fill{height:2px;border-radius:1px;transition:width .4s;}
+
+/* ── Card area ── */
+.card-area{flex:1;overflow-y:auto;padding:14px;}
+.filter-row{display:flex;gap:5px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.fc{padding:3px 10px;border-radius:14px;font-size:10px;font-weight:700;font-family:'Cinzel',serif;
+  cursor:pointer;border:1.5px solid transparent;transition:all .13s;letter-spacing:.05em;}
+.fc-all{background:var(--bg-input);color:var(--text-mid);border-color:var(--border-hi);}
+.fc-all.active{border-color:var(--gold-dark);color:var(--gold);}
+.fc-search{margin-left:auto;position:relative;}
+.fc-search input{background:var(--bg-input);border:1px solid var(--border);border-radius:14px;
+  color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:11px;padding:3px 10px 3px 26px;
+  outline:none;width:130px;transition:border-color .2s,width .2s;}
+.fc-search input:focus{border-color:var(--gold-dark);width:180px;}
+.fc-search input::placeholder{color:var(--text-dim);}
+.fc-search-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text-dim);pointer-events:none;}
+.card-count{font-size:10px;color:var(--text-dim);margin-left:4px;}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:11px;}
+
+/* ── Card ── */
+.ci{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;
+  transition:transform .18s,box-shadow .18s,border-color .18s;position:relative;}
+.ci:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.55);}
+.ci[data-g]{border-color:var(--gc,var(--border));}
+.ci-thumb{aspect-ratio:5/7;position:relative;overflow:hidden;background:var(--bg-input);}
+.ci-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s;}
+.ci:hover .ci-thumb img{transform:scale(1.05);}
+.ci-ph{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:5px;color:var(--text-dim);}
+.ci-ph-ico{font-size:22px;opacity:.2;}
+.ci-ph-name{font-size:10px;text-align:center;padding:0 6px;line-height:1.4;}
+.ci-ribbon{position:absolute;top:0;right:0;width:30px;height:30px;display:flex;align-items:center;
+  justify-content:center;font-family:'Cinzel',serif;font-size:13px;font-weight:700;
+  border-radius:0 0 0 6px;box-shadow:-1px 1px 5px rgba(0,0,0,.55);z-index:2;}
+/* friend badge in card thumb */
+.ci-peer{position:absolute;bottom:4px;left:4px;display:flex;align-items:center;gap:3px;z-index:2;}
+.ci-peer-badge{width:20px;height:20px;border-radius:3px;display:flex;align-items:center;
+  justify-content:center;font-family:'Cinzel',serif;font-size:9px;font-weight:700;
+  box-shadow:0 1px 4px rgba(0,0,0,.7);opacity:.92;}
+.ci-peer-name{font-size:8px;color:rgba(255,255,255,.55);background:rgba(0,0,0,.5);
+  padding:1px 4px;border-radius:2px;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ci-del{position:absolute;top:4px;left:4px;width:18px;height:18px;background:rgba(0,0,0,.65);
+  border:none;border-radius:50%;color:var(--text-dim);font-size:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;z-index:3;}
+.ci:hover .ci-del{opacity:1;}
+.ci-del:hover{color:#d06060;}
+.ci-body{padding:7px 8px 8px;}
+.ci-name{font-size:11px;font-weight:500;color:var(--text);margin-bottom:5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;}
+.gb-row{display:flex;gap:2px;margin-bottom:5px;}
+.gb{flex:1;height:19px;border-radius:2px;border:none;font-family:'Cinzel',serif;
+  font-size:9px;font-weight:700;cursor:pointer;opacity:.28;transition:opacity .12s,transform .1s;}
+.gb:hover{opacity:.62;}
+.gb.sel{opacity:1;transform:scaleY(1.1);}
+.gb.s{background:var(--s-bg);color:#fff;}.gb.a{background:var(--a-bg);color:#fff;}
+.gb.b{background:var(--b-bg);color:#fff;}.gb.c{background:var(--c-bg);color:#fff;}
+.gb.d{background:var(--d-bg);color:var(--d-fg);}
+.note-box{width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:3px;
+  color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:10px;padding:4px 6px;
+  resize:none;outline:none;line-height:1.5;transition:border-color .2s;user-select:text;}
+.note-box:focus{border-color:var(--gold-dark);}
+.note-box::placeholder{color:var(--text-dim);}
+.note-box:read-only{opacity:.55;cursor:default;}
+.empty{grid-column:1/-1;text-align:center;padding:55px 20px;color:var(--text-dim);}
+.empty-ico{font-size:34px;opacity:.18;margin-bottom:10px;}
+.empty-txt{font-size:12px;}
+
+/* ── Compare view ── */
+.cmp-area{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;}
+.cmp-tab-label{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.15em;
+  padding-bottom:7px;margin-bottom:8px;border-bottom:1px solid var(--border);}
+.cmp-head{display:grid;grid-template-columns:165px 1fr 1fr;gap:10px;font-size:11px;
+  color:var(--text-dim);padding-bottom:5px;border-bottom:1px solid var(--border-hi);margin-bottom:5px;}
+.cmp-hl{text-align:center;font-family:'Cinzel',serif;font-size:11px;}
+.cmp-row{display:grid;grid-template-columns:165px 1fr 1fr;gap:10px;align-items:start;
+  padding:6px 0;border-bottom:1px solid rgba(37,43,56,.6);}
+.cmp-row.diff{background:rgba(180,100,40,.06);border-radius:4px;padding:6px 7px;}
+.cmp-name{font-size:12px;color:var(--text);display:flex;align-items:center;gap:5px;}
+.diff-ico{font-size:13px;}
+.cmp-cell{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.cmp-badge{width:34px;height:34px;border-radius:5px;display:flex;align-items:center;
+  justify-content:center;font-family:'Cinzel',serif;font-size:15px;font-weight:700;}
+.cmp-note{font-size:10px;color:var(--text-dim);text-align:center;line-height:1.4;max-width:105px;}
+
+/* ── Modals ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.overlay.open{display:flex;}
+.modal{background:var(--bg-panel);border:1px solid var(--gold-dark);border-radius:10px;
+  padding:20px;width:90%;max-width:460px;box-shadow:0 18px 55px rgba(0,0,0,.7);
+  max-height:88vh;overflow-y:auto;}
+.modal-title{font-family:'Cinzel',serif;font-size:14px;color:var(--gold-light);
+  margin-bottom:15px;letter-spacing:.1em;}
+.mf{margin-bottom:12px;}
+.mf label{display:block;font-size:10px;letter-spacing:.15em;color:var(--text-dim);
+  text-transform:uppercase;margin-bottom:4px;}
+.mf input,.mf textarea,.mf select{width:100%;background:var(--bg-input);border:1px solid var(--border);
+  border-radius:4px;color:var(--text);font-family:'Noto Sans SC',sans-serif;
+  font-size:12px;padding:7px 9px;outline:none;transition:border-color .2s;}
+.mf input:focus,.mf textarea:focus,.mf select:focus{border-color:var(--gold-dark);}
+.mf textarea{resize:vertical;min-height:80px;}
+.mf select option{background:var(--bg-panel);}
+.hint{font-size:10px;color:var(--text-dim);line-height:1.6;margin-top:5px;}
+.hint b{color:var(--text-mid);}
+.m-btns{display:flex;gap:7px;justify-content:flex-end;margin-top:13px;}
+.import-modes{display:flex;gap:6px;margin-bottom:10px;}
+.imode-btn{flex:1;padding:7px;border-radius:4px;font-size:11px;cursor:pointer;
+  background:var(--bg-input);border:1px solid var(--border);color:var(--text-dim);
+  text-align:center;transition:all .15s;font-family:'Noto Sans SC',sans-serif;}
+.imode-btn.active{border-color:var(--gold-dark);color:var(--gold);background:rgba(138,109,42,.15);}
+.imode-panel{display:none;}.imode-panel.active{display:block;}
+
+/* Import result */
+.import-result{margin-top:8px;font-size:11px;padding:7px 9px;border-radius:4px;
+  background:rgba(30,132,73,.12);border:1px solid rgba(30,132,73,.3);color:#7ecba1;display:none;}
+.import-result.err{background:rgba(192,57,43,.12);border-color:rgba(192,57,43,.3);color:#d07070;}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:16px;right:16px;background:var(--bg-panel);
+  border:1px solid var(--gold-dark);color:var(--text);padding:7px 13px;border-radius:5px;
+  font-size:11px;z-index:300;transform:translateY(10px);opacity:0;transition:all .2s;pointer-events:none;}
+.toast.on{transform:translateY(0);opacity:1;}
+
+/* Loading skeleton */
+.skeleton-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:11px;}
+.skel{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.skel-thumb{aspect-ratio:5/7;background:linear-gradient(110deg,var(--bg-input) 30%,var(--border) 50%,var(--bg-input) 70%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;}
+.skel-body{padding:8px;display:flex;flex-direction:column;gap:6px;}
+.skel-line{height:8px;border-radius:3px;background:linear-gradient(110deg,var(--bg-input) 30%,var(--border) 50%,var(--bg-input) 70%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Header -->
+<header>
+  <div class="logo">RIFTBOUND<small>CARD RATER</small></div>
+
+  <div class="header-center">
+    <span style="font-size:11px;color:var(--text-dim)">视角</span>
+    <div class="user-toggle" id="userToggle">
+      <button class="user-btn active" id="uBtnA" onclick="switchUser('A')">玩家 A</button>
+      <button class="user-btn"        id="uBtnB" onclick="switchUser('B')">玩家 B</button>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <div class="sync-pill">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLabel">连接中…</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="openImport()">导入卡牌</button>
+    <button class="btn btn-ghost btn-sm" onclick="openCompare()">⚖ 对比</button>
+    <button class="btn btn-danger btn-sm" onclick="clearTab()">清空此页</button>
+  </div>
+</header>
+
+<!-- Tabs -->
+<div class="tab-bar" id="tabBar"></div>
+
+<!-- Main -->
+<div class="main">
+  <div class="sidebar">
+
+    <div class="sb-sec">
+      <div class="sb-title">添加单卡</div>
+      <div class="add-form">
+        <div class="url-row">
+          <input type="url" id="inImg" placeholder="卡图 URL（可选）" oninput="onImgInput()" />
+          <button class="ocr-btn" id="ocrBtn" onclick="runOCR()" title="AI 识别卡名">识别</button>
+        </div>
+        <div class="ocr-status" id="ocrStatus"></div>
+        <input type="text" id="inName" placeholder="卡牌名称" />
+        <button class="btn btn-gold" onclick="addCard()" style="width:100%;margin-top:1px">+ 添加</button>
+      </div>
+    </div>
+
+    <div class="prog-wrap">
+      <div class="prog-hd"><span id="progLabel">当前页进度</span><span id="progPct">0%</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="sb-title" style="padding:10px 13px 0">评级说明</div>
+    <div class="legend">
+      <div class="leg-row">
+        <div class="leg-badge" style="background:var(--s-bg);color:#fff">S</div>
+        <div class="leg-text"><b>构筑核心</b>围绕此卡建立整副牌的策略支柱</div>
+      </div>
+      <div class="leg-row">
+        <div class="leg-badge" style="background:var(--a-bg);color:#fff">A</div>
+        <div class="leg-text"><b>色组首选</b>对应色组中几乎必带的高强度单卡</div>
+      </div>
+      <div class="leg-row">
+        <div class="leg-badge" style="background:var(--b-bg);color:#fff">B</div>
+        <div class="leg-text"><b>联动良好</b>联动匹配或特定策略下值得优先选取</div>
+      </div>
+      <div class="leg-row">
+        <div class="leg-badge" style="background:var(--c-bg);color:#fff">C</div>
+        <div class="leg-text"><b>可用补位</b>可接受的轮抽补充，无更好选择时考虑</div>
+      </div>
+      <div class="leg-row">
+        <div class="leg-badge" style="background:var(--d-bg);color:var(--d-fg)">D</div>
+        <div class="leg-text"><b>弃用</b>强度不足，几乎不值得选入任何构筑</div>
+      </div>
+    </div>
+
+    <div class="sb-stats" id="sbStats"></div>
+  </div>
+
+  <!-- Cards -->
+  <div id="cardArea" class="card-area">
+    <div class="filter-row" id="filterRow"></div>
+    <div class="card-grid" id="cardGrid"></div>
+  </div>
+
+  <!-- Compare -->
+  <div id="cmpArea" class="cmp-area" style="display:none"></div>
+</div>
+</div>
+
+<!-- ── Import Modal ── -->
+<div class="overlay" id="importOv">
+  <div class="modal">
+    <div class="modal-title">导入卡牌</div>
+    <div class="import-modes">
+      <div class="imode-btn active" id="iModeJson" onclick="switchImportMode('json')">📄 JSON 文件</div>
+      <div class="imode-btn" id="iModeText"         onclick="switchImportMode('text')">✏ 手动文本</div>
+    </div>
+
+    <!-- JSON file mode -->
+    <div class="imode-panel active" id="iPanelJson">
+      <div class="mf">
+        <label>选择 JSON 文件</label>
+        <input type="file" id="jsonFile" accept=".json"
+          style="background:none;border:none;padding:0;color:var(--text-mid);font-size:12px"
+          onchange="previewJson()" />
+        <div class="hint">支持官网爬取格式：<b>{"tab名": [{"name":"…","img":"…"}]}</b><br>
+          已有卡牌（同名同页）自动跳过，不会覆盖现有评级。</div>
+      </div>
+      <div class="mf">
+        <label>导入目标</label>
+        <select id="jsonTarget">
+          <option value="all">按 JSON 中的分页分别导入</option>
+          <option value="special">传奇 / 专法</option>
+          <option value="red">红</option>
+          <option value="green">绿</option>
+          <option value="blue">蓝</option>
+          <option value="orange">橙</option>
+          <option value="purple">紫</option>
+          <option value="yellow">黄</option>
+        </select>
+      </div>
+      <div class="import-result" id="jsonResult"></div>
+      <div class="m-btns">
+        <button class="btn btn-ghost" onclick="closeImport()">取消</button>
+        <button class="btn btn-gold" onclick="doJsonImport()">导入</button>
+      </div>
+    </div>
+
+    <!-- Text mode -->
+    <div class="imode-panel" id="iPanelText">
+      <div class="mf">
+        <label>每行一张</label>
+        <textarea id="bulkTxt" placeholder="月之降临&#10;https://example.com/card.png&#10;皎月护卫|https://example.com/card2.png"></textarea>
+        <div class="hint">格式：<b>卡名</b> / <b>图片URL</b> / <b>卡名|图片URL</b><br>
+          导入到当前选中页签，重复卡名自动跳过。</div>
+      </div>
+      <div class="m-btns">
+        <button class="btn btn-ghost" onclick="closeImport()">取消</button>
+        <button class="btn btn-gold" onclick="doBulkImport()">导入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Compare Modal ── -->
+<div class="overlay" id="cmpOv">
+  <div class="modal">
+    <div class="modal-title">⚖ 评级对比</div>
+    <div class="hint" style="margin-bottom:12px">实时读取两位玩家在 Supabase 中的评级，自动对比差异。</div>
+    <div class="m-btns">
+      <button class="btn btn-ghost" onclick="closeCmp()">关闭</button>
+      <button class="btn btn-gold" onclick="startCompare()">开始对比</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIG — fill in your Supabase credentials
+// ═══════════════════════════════════════════════════════════
+const SB_URL = 'https://vepqjryrhvuehwemabqu.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlcHFqcnlyaHZ1ZWh3ZW1hYnF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjA2MjYsImV4cCI6MjA5MDQzNjYyNn0.8ZWqTUwEQX1zFwTCLx7eqwfocDmw5DId2rrxoxDjrPk';
+
+// Table schema (create once in Supabase dashboard):
+//   cards_v2
+//   ├─ id       text  PRIMARY KEY
+//   ├─ tab      text
+//   ├─ name     text
+//   ├─ img      text  nullable
+//   ├─ pos      int4
+//   ├─ grade_a  text  nullable   ← player A grade
+//   ├─ note_a   text  nullable
+//   ├─ grade_b  text  nullable   ← player B grade
+//   └─ note_b   text  nullable
+//
+//  RLS: disable or add anon read+write policy
+
+const TABLE = 'cards_v2';
+
+// ═══════════════════════════════════════════════════════════
+//  TAB CONFIG
+// ═══════════════════════════════════════════════════════════
+const TABS = [
+  { id:'special', label:'传奇 / 专法', color:'#c9a84c' },
+  { id:'red',     label:'红',          color:'#e05252' },
+  { id:'green',   label:'绿',          color:'#52b96e' },
+  { id:'blue',    label:'蓝',          color:'#5b9fe0' },
+  { id:'orange',  label:'橙',          color:'#e07d30' },
+  { id:'purple',  label:'紫',          color:'#9b6de0' },
+  { id:'yellow',  label:'黄',          color:'#d4b935' },
+];
+
+const G  = ['S','A','B','C','D'];
+const GC = { S:'#c0392b', A:'#d4820a', B:'#1e8449', C:'#1a6fa8', D:'#3d4455' };
+const GF = { S:'#fff', A:'#fff', B:'#fff', C:'#fff', D:'#9aa' };
+const GL = { S:'构筑核心', A:'色组首选', B:'联动良好', C:'可用补位', D:'弃用' };
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+// db[tab] = [{ id, name, img, pos, grade_a, note_a, grade_b, note_b }]
+let db = {};
+TABS.forEach(t => db[t.id] = []);
+
+let activeUser   = 'a';   // 'a' | 'b'
+let activeTab    = 'special';
+let activeFilter = 'ALL';
+let searchQuery  = '';
+let noteTimer    = null;
+let pollTimer    = null;
+let lastHash     = '';
+let isLoading    = true;
+
+// ═══════════════════════════════════════════════════════════
+//  SUPABASE HELPERS
+// ═══════════════════════════════════════════════════════════
+const SB_HDR = () => ({
+  'apikey':        SB_KEY,
+  'Authorization': 'Bearer ' + SB_KEY,
+  'Content-Type':  'application/json',
+  'Prefer':        'return=minimal',
+});
+
+async function sbFetch(path, method = 'GET', body = null) {
+  const opts = { method, headers: SB_HDR() };
+  if (body !== null) opts.body = JSON.stringify(body);
+  const r = await fetch(SB_URL + '/rest/v1/' + path, opts);
+  if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+  if (r.status === 204 || method === 'DELETE') return null;
+  return r.json();
+}
+
+// Upsert: insert or update on conflict of id
+async function sbUpsert(rows) {
+  const hdrs = { ...SB_HDR(), 'Prefer': 'resolution=merge-duplicates,return=minimal' };
+  const r = await fetch(SB_URL + '/rest/v1/' + TABLE, {
+    method: 'POST', headers: hdrs, body: JSON.stringify(rows)
+  });
+  if (!r.ok) throw new Error(`upsert ${r.status}: ${await r.text()}`);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BOOT & SYNC
+// ═══════════════════════════════════════════════════════════
+async function boot() {
+  setSyncState('syncing', '连接中…');
+  showSkeleton();
+  try {
+    await sbFetch(`${TABLE}?limit=1&select=id`);   // connection test
+    await loadAll();
+    pollTimer = setInterval(poll, 5000);
+  } catch(e) {
+    console.error('boot error', e);
+    setSyncState('err', '连接失败');
+    isLoading = false;
+    renderAll();
+  }
+}
+
+async function loadAll() {
+  setSyncState('syncing', '加载中…');
+  try {
+    const rows = await sbFetch(`${TABLE}?select=*&order=tab,pos`);
+    applyRows(rows);
+    lastHash = hashRows(rows);
+    setSyncState('live', '已同步');
+  } catch(e) {
+    console.error('load error', e);
+    setSyncState('err', '加载失败');
+  }
+  isLoading = false;
+  renderAll();
+}
+
+function applyRows(rows) {
+  TABS.forEach(t => db[t.id] = []);
+  for (const r of rows) {
+    if (!db[r.tab]) continue;
+    db[r.tab].push({
+      id: r.id, name: r.name, img: r.img || '', pos: r.pos || 0,
+      grade_a: r.grade_a || null, note_a: r.note_a || '',
+      grade_b: r.grade_b || null, note_b: r.note_b || '',
+    });
+  }
+}
+
+async function poll() {
+  try {
+    const rows = await sbFetch(`${TABLE}?select=*&order=tab,pos`);
+    const h = hashRows(rows);
+    if (h !== lastHash) {
+      lastHash = h;
+      applyRows(rows);
+      renderAll();
+      setSyncState('live', '已同步');
+    }
+  } catch { /* silent */ }
+}
+
+function hashRows(rows) {
+  return JSON.stringify(rows.map(r =>
+    `${r.id}:${r.grade_a}:${r.note_a}:${r.grade_b}:${r.note_b}:${r.name}`));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CARD OPS
+// ═══════════════════════════════════════════════════════════
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
+
+async function addCard() {
+  const name = document.getElementById('inName').value.trim();
+  const img  = document.getElementById('inImg').value.trim();
+  if (!name && !img) { toast('请至少填入卡名或图片 URL'); return; }
+  const list = db[activeTab];
+  const cardName = name || `卡牌 #${list.length + 1}`;
+  if (list.find(c => c.name === cardName)) { toast('该卡牌已存在'); return; }
+  const card = { id: uid(), name: cardName, img, pos: list.length,
+    grade_a: null, note_a: '', grade_b: null, note_b: '' };
+  list.push(card);
+  document.getElementById('inName').value = '';
+  document.getElementById('inImg').value  = '';
+  document.getElementById('ocrStatus').textContent = '';
+  renderAll();
+  await saveCard(card);
+  toast('已添加：' + cardName);
+}
+
+async function delCard(id) {
+  if (!confirm('确定删除此卡牌？此操作会从 Supabase 永久移除。')) return;
+  TABS.forEach(t => { db[t.id] = db[t.id].filter(c => c.id !== id); });
+  renderAll();
+  setSyncState('syncing', '同步中…');
+  try {
+    await sbFetch(`${TABLE}?id=eq.${encodeURIComponent(id)}`, 'DELETE');
+    setSyncState('live', '已同步');
+  } catch(e) {
+    console.error('delete error', e);
+    setSyncState('err', '删除失败');
+  }
+}
+
+async function setGrade(id, grade) {
+  const c = findCard(id);
+  if (!c) return;
+  const key = 'grade_' + activeUser;
+  c[key] = c[key] === grade ? null : grade;
+  renderAll();
+  await saveCard(c);
+}
+
+function updateNote(id, val) {
+  const c = findCard(id);
+  if (!c) return;
+  c['note_' + activeUser] = val;
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => saveCard(c), 900);
+}
+
+async function saveCard(card) {
+  const tab  = findTabOf(card.id) || activeTab;
+  const row  = { id: card.id, tab, name: card.name, img: card.img || '', pos: card.pos || 0,
+    grade_a: card.grade_a || null, note_a: card.note_a || '',
+    grade_b: card.grade_b || null, note_b: card.note_b || '' };
+  setSyncState('syncing', '同步中…');
+  try {
+    await sbUpsert(row);
+    setSyncState('live', '已同步');
+  } catch(e) {
+    console.error('save error', e);
+    setSyncState('err', '同步失败');
+  }
+}
+
+async function editImg(id) {
+  const c = findCard(id);
+  if (!c) return;
+  const url = prompt(`为「${c.name}」设置图片 URL（留空清除）：`, c.img || '');
+  if (url === null) return;
+  c.img = url.trim();
+  renderCards();
+  await saveCard(c);
+}
+
+async function editName(id, el) {
+  const c = findCard(id);
+  if (!c) return;
+  const inp = document.createElement('input');
+  inp.value = c.name;
+  inp.style.cssText = 'width:100%;background:var(--bg-input);border:1px solid var(--gold-dark);border-radius:3px;color:var(--text);font-size:11px;padding:2px 5px;font-family:inherit;outline:none;user-select:text;';
+  el.replaceWith(inp); inp.focus(); inp.select();
+  const commit = async () => {
+    const v = inp.value.trim();
+    if (v && v !== c.name) { c.name = v; await saveCard(c); }
+    renderAll();
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') renderAll();
+  });
+}
+
+async function clearTab() {
+  const label = TABS.find(t => t.id === activeTab).label;
+  if (!confirm(`确定清空「${label}」页的所有卡牌？\n此操作将从 Supabase 永久删除所有该页卡牌。`)) return;
+  const ids = db[activeTab].map(c => c.id);
+  db[activeTab] = [];
+  renderAll();
+  if (!ids.length) return;
+  setSyncState('syncing', '同步中…');
+  try {
+    // Delete in batch via IN filter
+    const idList = ids.map(i => `"${i}"`).join(',');
+    await sbFetch(`${TABLE}?id=in.(${ids.map(i => encodeURIComponent(i)).join(',')})`, 'DELETE');
+    setSyncState('live', '已同步');
+    toast(`已清空 ${ids.length} 张卡牌`);
+  } catch(e) {
+    console.error('clearTab error', e);
+    setSyncState('err', '清空失败');
+  }
+}
+
+function findCard(id)   { for(const t of TABS){ const c=db[t.id].find(c=>c.id===id); if(c) return c; } }
+function findTabOf(id)  { for(const t of TABS){ if(db[t.id].find(c=>c.id===id)) return t.id; } }
+
+// ═══════════════════════════════════════════════════════════
+//  IMPORT
+// ═══════════════════════════════════════════════════════════
+let importMode = 'json';
+
+function openImport()  { document.getElementById('importOv').classList.add('open'); }
+function closeImport() { document.getElementById('importOv').classList.remove('open'); }
+
+function switchImportMode(mode) {
+  importMode = mode;
+  document.getElementById('iModeJson').classList.toggle('active', mode === 'json');
+  document.getElementById('iModeText').classList.toggle('active', mode === 'text');
+  document.getElementById('iPanelJson').classList.toggle('active', mode === 'json');
+  document.getElementById('iPanelText').classList.toggle('active', mode === 'text');
+}
+
+function previewJson() {
+  const res = document.getElementById('jsonResult');
+  res.style.display = 'none';
+}
+
+async function doJsonImport() {
+  const file   = document.getElementById('jsonFile').files[0];
+  const target = document.getElementById('jsonTarget').value;
+  const res    = document.getElementById('jsonResult');
+  if (!file) { toast('请先选择 JSON 文件'); return; }
+
+  let parsed;
+  try {
+    const text = await file.text();
+    parsed = JSON.parse(text);
+  } catch {
+    res.textContent = '❌ JSON 格式错误，请检查文件内容';
+    res.className = 'import-result err'; res.style.display = 'block';
+    return;
+  }
+
+  // Accept two formats:
+  // 1. Official scrape: { tabId: [{name, img}] }
+  // 2. App export (old): { tabId: [{id, name, img, grade, note}] }
+  let total = 0, skipped = 0, added = 0;
+  const newCards = [];
+
+  const importIntoTab = (tabId, items) => {
+    const list = db[tabId];
+    if (!list) return;
+    for (const item of items) {
+      const cardName = item.name || `卡牌 #${list.length + total + 1}`;
+      total++;
+      if (list.find(c => c.name === cardName)) { skipped++; continue; }
+      const card = {
+        id: uid(), name: cardName, img: item.img || '', pos: list.length,
+        grade_a: null, note_a: '', grade_b: null, note_b: ''
+      };
+      list.push(card);
+      newCards.push({ card, tabId });
+      added++;
+    }
+  };
+
+  if (target === 'all') {
+    // Multi-tab JSON: { special: [...], red: [...], ... }
+    for (const [key, items] of Object.entries(parsed)) {
+      if (!Array.isArray(items)) continue;
+      const tabId = key.toLowerCase();
+      importIntoTab(tabId, items);
+    }
+  } else {
+    // Force all into selected tab
+    let items = [];
+    if (Array.isArray(parsed)) {
+      items = parsed;
+    } else {
+      // Flatten all arrays from the JSON
+      for (const v of Object.values(parsed)) {
+        if (Array.isArray(v)) items.push(...v);
+      }
+    }
+    importIntoTab(target, items);
+  }
+
+  renderAll();
+
+  // Batch upsert to Supabase
+  if (newCards.length) {
+    setSyncState('syncing', '同步中…');
+    try {
+      const rows = newCards.map(({ card, tabId }) => ({
+        id: card.id, tab: tabId, name: card.name, img: card.img || '',
+        pos: card.pos, grade_a: null, note_a: '', grade_b: null, note_b: ''
+      }));
+      // Upsert in chunks of 200
+      for (let i = 0; i < rows.length; i += 200) {
+        await sbUpsert(rows.slice(i, i + 200));
+      }
+      setSyncState('live', '已同步');
+    } catch(e) {
+      console.error('import upsert error', e);
+      setSyncState('err', '同步失败');
+    }
+  }
+
+  res.textContent = `✓ 成功导入 ${added} 张，跳过重复 ${skipped} 张（共 ${total} 张）`;
+  res.className = 'import-result'; res.style.display = 'block';
+  toast(`导入完成：+${added} 张`);
+}
+
+async function doBulkImport() {
+  const lines = document.getElementById('bulkTxt').value.split('\n').filter(l => l.trim());
+  const list  = db[activeTab];
+  const newCards = [];
+  let added = 0;
+  for (const line of lines) {
+    const t = line.trim();
+    let name, img;
+    if (t.includes('|'))                                      { [name, img] = t.split('|').map(s => s.trim()); }
+    else if (t.startsWith('http://') || t.startsWith('https://')) { img = t; name = ''; }
+    else                                                          { name = t; img = ''; }
+    const cardName = name || `卡牌 #${list.length + added + 1}`;
+    if (list.find(c => c.name === cardName)) continue;
+    const card = { id: uid(), name: cardName, img: img || '', pos: list.length + added,
+      grade_a: null, note_a: '', grade_b: null, note_b: '' };
+    list.push(card);
+    newCards.push(card);
+    added++;
+  }
+  document.getElementById('bulkTxt').value = '';
+  closeImport();
+  renderAll();
+  if (newCards.length) {
+    setSyncState('syncing', '同步中…');
+    try {
+      const rows = newCards.map(c => ({
+        id: c.id, tab: activeTab, name: c.name, img: c.img || '', pos: c.pos,
+        grade_a: null, note_a: '', grade_b: null, note_b: ''
+      }));
+      await sbUpsert(rows);
+      setSyncState('live', '已同步');
+    } catch(e) { setSyncState('err', '同步失败'); }
+  }
+  toast(`已导入 ${added} 张卡牌`);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  USER SWITCH
+// ═══════════════════════════════════════════════════════════
+function switchUser(u) {
+  activeUser = u.toLowerCase();
+  document.getElementById('uBtnA').classList.toggle('active', activeUser === 'a');
+  document.getElementById('uBtnB').classList.toggle('active', activeUser === 'b');
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COMPARE
+// ═══════════════════════════════════════════════════════════
+function openCompare() { document.getElementById('cmpOv').classList.add('open'); }
+function closeCmp()    { document.getElementById('cmpOv').classList.remove('open'); }
+
+function startCompare() {
+  closeCmp();
+  document.getElementById('cardArea').style.display = 'none';
+  const area = document.getElementById('cmpArea');
+  area.style.display = 'flex';
+
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center">
+    <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold-light);letter-spacing:.1em">评级对比</div>
+    <button class="btn btn-ghost btn-sm" onclick="exitCmp()">退出对比</button>
+  </div>`;
+
+  for (const t of TABS) {
+    const cards = db[t.id];
+    if (!cards.length) continue;
+    html += `<div><div class="cmp-tab-label" style="color:${t.color}">${t.label}</div>
+      <div class="cmp-head">
+        <div>卡牌</div>
+        <div class="cmp-hl" style="color:var(--gold)">玩家 A</div>
+        <div class="cmp-hl" style="color:#8ab4e8">玩家 B</div>
+      </div>`;
+    for (const c of cards) {
+      const ga = c.grade_a, gb = c.grade_b, diff = ga !== gb;
+      const badge = (g, col) => g
+        ? `<div class="cmp-badge" style="background:${GC[g]};color:${GF[g]}">${g}</div>`
+        : `<div class="cmp-badge" style="background:var(--bg-input);color:var(--text-dim);font-size:12px">—</div>`;
+      html += `<div class="cmp-row ${diff ? 'diff' : ''}">
+        <div class="cmp-name">${diff ? '<span class="diff-ico">⚡</span>' : '<span style="width:14px"></span>'}${c.name}</div>
+        <div class="cmp-cell">${badge(ga)}${c.note_a ? `<div class="cmp-note">${c.note_a}</div>` : ''}</div>
+        <div class="cmp-cell">${badge(gb)}${c.note_b ? `<div class="cmp-note">${c.note_b}</div>` : ''}</div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  area.innerHTML = html;
+}
+
+function exitCmp() {
+  document.getElementById('cardArea').style.display = '';
+  document.getElementById('cmpArea').style.display  = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════════
+function renderAll() { renderTabs(); renderFilter(); renderCards(); renderStats(); renderProgress(); }
+
+function renderTabs() {
+  document.getElementById('tabBar').innerHTML = TABS.map(t => {
+    const list    = db[t.id];
+    const graded  = list.filter(c => c['grade_' + activeUser]).length;
+    const total   = list.length;
+    const pctStr  = total ? `${graded}/${total}` : '';
+    return `<div class="tab ${activeTab === t.id ? 'active' : ''}" style="--ta:${t.color}"
+      onclick="switchTab('${t.id}')">
+      <div class="tab-pip"></div>${t.label}
+      <div class="tab-n">${total}</div>
+      ${total && graded === total ? '<span class="tab-prog">✓</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function switchTab(id) {
+  activeTab = id; activeFilter = 'ALL'; searchQuery = '';
+  document.getElementById('searchBox') && (document.getElementById('searchBox').value = '');
+  renderAll();
+}
+
+function renderFilter() {
+  const gKey = 'grade_' + activeUser;
+  const items = [
+    { k:'ALL', label:'全部' },
+    ...G.map(g => ({ k:g, label:g, grade:true })),
+    { k:'NONE', label:'未评' }
+  ];
+  const filters = items.map(i => {
+    const isG = !!i.grade, isActive = activeFilter === i.k;
+    const style = isG
+      ? `background:${GC[i.k]};color:${GF[i.k]};${isActive ? '' : 'opacity:.42'};border-color:${GC[i.k]}`
+      : '';
+    return `<div class="fc ${!isG ? 'fc-all' : ''} ${isActive && !isG ? 'active' : ''}"
+      style="${style}" onclick="setFilter('${i.k}')">${i.label}</div>`;
+  }).join('');
+
+  const cnt = filtered().length;
+  const total = db[activeTab].length;
+  const countLabel = cnt < total
+    ? `<span class="card-count">${cnt} / ${total}</span>` : '';
+
+  document.getElementById('filterRow').innerHTML =
+    filters + countLabel +
+    `<div class="fc-search">
+      <span class="fc-search-ico">🔍</span>
+      <input id="searchBox" type="text" placeholder="搜索…" value="${searchQuery}"
+        oninput="onSearch(this.value)" />
+    </div>`;
+}
+
+function setFilter(f) { activeFilter = f; renderFilter(); renderCards(); }
+
+function onSearch(v) {
+  searchQuery = v.trim();
+  renderCards();
+  // update count label without re-rendering the whole filter row
+  const cnt = filtered().length, total = db[activeTab].length;
+  const cl = document.querySelector('.card-count');
+  if (cl) cl.textContent = cnt < total ? `${cnt} / ${total}` : '';
+}
+
+function filtered() {
+  const gKey = 'grade_' + activeUser;
+  let list = db[activeTab];
+  if (activeFilter === 'NONE') list = list.filter(c => !c[gKey]);
+  else if (activeFilter !== 'ALL') list = list.filter(c => c[gKey] === activeFilter);
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(c => c.name.toLowerCase().includes(q));
+  }
+  return list;
+}
+
+function renderCards() {
+  const grid  = document.getElementById('cardGrid');
+  if (isLoading) { showSkeleton(); return; }
+  const cards = filtered();
+  const gKey  = 'grade_' + activeUser;
+  const nKey  = 'note_'  + activeUser;
+  const pgKey = 'grade_' + (activeUser === 'a' ? 'b' : 'a'); // peer
+  const peerLabel = activeUser === 'a' ? 'B' : 'A';
+
+  if (!cards.length) {
+    const msg = db[activeTab].length === 0
+      ? '此页还没有卡牌<br>在左侧手动添加，或使用「导入卡牌」'
+      : '此筛选下无卡牌';
+    grid.innerHTML = `<div class="empty"><div class="empty-ico">🃏</div><div class="empty-txt">${msg}</div></div>`;
+    return;
+  }
+
+  grid.innerHTML = cards.map(c => {
+    const gc = c[gKey] ? GC[c[gKey]] : null;
+    const gf = c[gKey] ? GF[c[gKey]] : null;
+    const pg = c[pgKey];
+
+    return `<div class="ci" ${gc ? `data-g="${c[gKey]}" style="--gc:${gc}"` : ''}
+      ondblclick="editImg('${c.id}')" title="双击修改图片">
+      <button class="ci-del" onclick="delCard('${c.id}')">×</button>
+      <div class="ci-thumb">
+        ${c.img
+          ? `<img src="${c.img}" alt="${c.name}"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+             <div class="ci-ph" style="display:none">
+               <div class="ci-ph-ico">🃏</div>
+               <div class="ci-ph-name">${c.name}</div>
+             </div>`
+          : `<div class="ci-ph">
+               <div class="ci-ph-ico">🃏</div>
+               <div class="ci-ph-name">${c.name}</div>
+             </div>`
+        }
+        ${c[gKey] ? `<div class="ci-ribbon" style="background:${gc};color:${gf}">${c[gKey]}</div>` : ''}
+        ${pg ? `<div class="ci-peer">
+          <div class="ci-peer-badge" style="background:${GC[pg]};color:${GF[pg]}">${pg}</div>
+          <span class="ci-peer-name">${peerLabel}</span>
+        </div>` : ''}
+      </div>
+      <div class="ci-body">
+        <div class="ci-name" title="点击编辑名称" onclick="editName('${c.id}',this)">${c.name}</div>
+        <div class="gb-row">
+          ${G.map(g => `<button class="gb ${g.toLowerCase()} ${c[gKey] === g ? 'sel' : ''}"
+            onclick="setGrade('${c.id}','${g}')">${g}</button>`).join('')}
+        </div>
+        <textarea class="note-box" rows="2" placeholder="备注…"
+          oninput="updateNote('${c.id}',this.value)">${c[nKey] || ''}</textarea>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderStats() {
+  const sec  = document.getElementById('sbStats');
+  const list = db[activeTab];
+  const gKey = 'grade_' + activeUser;
+  if (!list.length) { sec.innerHTML = ''; return; }
+  const total = list.length;
+  let html = `<div class="sb-title">当前页统计</div>`;
+  for (const g of G) {
+    const n = list.filter(c => c[gKey] === g).length;
+    const pct = Math.round(n / total * 100);
+    html += `<div class="st-row">
+      <div class="st-left">
+        <div class="st-badge" style="background:${GC[g]};color:${GF[g]}">${g}</div>
+        <span class="st-desc">${GL[g]}</span>
+      </div>
+      <div class="st-num">${n}</div>
+    </div>
+    <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${GC[g]}"></div></div>`;
+  }
+  const ur = list.filter(c => !c[gKey]).length;
+  html += `<div class="st-row" style="margin-top:3px">
+    <span class="st-desc">未评级</span>
+    <div class="st-num" style="font-size:13px">${ur}</div>
+  </div>`;
+  sec.innerHTML = html;
+}
+
+function renderProgress() {
+  const gKey  = 'grade_' + activeUser;
+  let graded = 0, total = 0;
+  TABS.forEach(t => {
+    const list = db[t.id];
+    total  += list.length;
+    graded += list.filter(c => c[gKey]).length;
+  });
+  const pct = total ? Math.round(graded / total * 100) : 0;
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progPct').textContent  = pct + '%';
+  document.getElementById('progLabel').textContent =
+    `全局进度 (${graded}/${total})`;
+}
+
+function showSkeleton() {
+  const grid = document.getElementById('cardGrid');
+  const n = 12;
+  grid.innerHTML = Array(n).fill(0).map(() =>
+    `<div class="skel"><div class="skel-thumb"></div>
+      <div class="skel-body">
+        <div class="skel-line" style="width:70%"></div>
+        <div class="skel-line" style="width:100%;height:14px"></div>
+        <div class="skel-line" style="width:100%;height:24px"></div>
+      </div></div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  OCR
+// ═══════════════════════════════════════════════════════════
+function onImgInput() {
+  const url = document.getElementById('inImg').value.trim();
+  document.getElementById('ocrBtn').style.opacity = url ? '1' : '0.4';
+}
+
+async function runOCR() {
+  const url = document.getElementById('inImg').value.trim();
+  if (!url) { toast('请先填入卡图 URL'); return; }
+  const btn = document.getElementById('ocrBtn');
+  const status = document.getElementById('ocrStatus');
+  btn.classList.add('loading'); btn.textContent = '识别中…';
+  status.textContent = '正在调用 AI…';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 64,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'url', url } },
+          { type: 'text',  text: '这是一张 Riftbound TCG 卡牌。请只回答卡牌名称（中文名），不要任何其他文字。无法识别则回答"未知"。' }
+        ]}]
+      })
+    });
+    const data = await resp.json();
+    const name = data?.content?.[0]?.text?.trim() || '';
+    if (name && name !== '未知') {
+      document.getElementById('inName').value = name;
+      status.textContent = `✓ ${name}`;
+      status.style.color = '#7ecba1';
+    } else {
+      status.textContent = '无法识别，请手动输入';
+      status.style.color = 'var(--text-dim)';
+    }
+  } catch(e) {
+    status.textContent = 'AI 识别失败';
+    status.style.color = '#d07070';
+  }
+  btn.classList.remove('loading'); btn.textContent = '识别';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SYNC STATE UI
+// ═══════════════════════════════════════════════════════════
+function setSyncState(state, label) {
+  document.getElementById('syncDot').className  = 'sync-dot ' + state;
+  document.getElementById('syncLabel').textContent = label;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════════
+let toastT;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('on'), 2400);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  KEY BINDINGS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('inName').addEventListener('keydown', e => { if(e.key==='Enter') addCard(); });
+document.getElementById('inImg').addEventListener('keydown',  e => { if(e.key==='Enter') addCard(); });
+document.getElementById('importOv').addEventListener('click', e => { if(e.target===e.currentTarget) closeImport(); });
+document.getElementById('cmpOv').addEventListener('click',   e => { if(e.target===e.currentTarget) closeCmp(); });
+
+// ═══════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════
+boot();
+</script>
+
+<!--
+  ═══ Supabase 建表 SQL（在 Supabase SQL Editor 执行一次）═══
+
+  CREATE TABLE public.cards_v2 (
+    id       text PRIMARY KEY,
+    tab      text NOT NULL,
+    name     text NOT NULL,
+    img      text,
+    pos      integer DEFAULT 0,
+    grade_a  text,
+    note_a   text,
+    grade_b  text,
+    note_b   text
+  );
+
+  -- 关闭 RLS（开发/私有使用）
+  ALTER TABLE public.cards_v2 DISABLE ROW LEVEL SECURITY;
+
+  -- 或者保留 RLS 并添加匿名读写策略：
+  -- CREATE POLICY "anon all" ON public.cards_v2
+  --   FOR ALL TO anon USING (true) WITH CHECK (true);
+-->
+
+</body>
+</html>
