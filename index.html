@@ -182,6 +182,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 .note-box:focus{border-color:var(--gold-dark);}
 .note-box::placeholder{color:var(--text-dim);}
 .note-box:read-only{opacity:.55;cursor:default;}
+.ci.kb-focus{outline:2px solid var(--gold-dark);outline-offset:-1px;}
+.ci.kb-focus::after{content:'';position:absolute;inset:0;background:rgba(201,168,76,.04);pointer-events:none;}
 .empty{grid-column:1/-1;text-align:center;padding:55px 20px;color:var(--text-dim);}
 .empty-ico{font-size:34px;opacity:.18;margin-bottom:10px;}
 .empty-txt{font-size:12px;}
@@ -252,6 +254,21 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
   background-size:200% 100%;animation:shimmer 1.4s infinite;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
+
+/* ── Lightbox ── */
+.lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:400;
+  align-items:center;justify-content:center;backdrop-filter:blur(6px);cursor:zoom-out;}
+.lightbox.open{display:flex;}
+.lb-inner{position:relative;max-width:min(420px,90vw);display:flex;flex-direction:column;align-items:center;gap:12px;}
+.lb-img{width:100%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.8);display:block;}
+.lb-ph{width:100%;aspect-ratio:5/7;border-radius:10px;background:var(--bg-card);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text-dim);}
+.lb-ph-ico{font-size:48px;opacity:.15;}
+.lb-name{font-family:'Cinzel',serif;font-size:13px;color:var(--gold-light);letter-spacing:.1em;text-align:center;}
+.lb-close{position:absolute;top:-14px;right:-14px;width:28px;height:28px;background:var(--bg-panel);
+  border:1px solid var(--border-hi);border-radius:50%;color:var(--text-mid);font-size:14px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.lb-close:hover{border-color:var(--gold-dark);color:var(--gold);}
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px;}
@@ -413,6 +430,15 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
   </div>
 </div>
 
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <div class="lb-inner" id="lbInner">
+    <button class="lb-close" onclick="closeLightbox()">×</button>
+    <div id="lbContent"></div>
+    <div class="lb-name" id="lbName"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -468,7 +494,7 @@ let activeTab    = 'special';
 let activeFilter = 'ALL';
 let searchQuery  = '';
 let noteTimer    = null;
-let pollTimer    = null;
+let realtimeChannel = null;   // Supabase Realtime channel
 let lastHash     = '';
 let isLoading    = true;
 
@@ -500,6 +526,158 @@ async function sbUpsert(rows) {
   if (!r.ok) throw new Error(`upsert ${r.status}: ${await r.text()}`);
 }
 
+
+// ═══════════════════════════════════════════════════════════
+//  MINIMAL SUPABASE REALTIME CLIENT
+//  Speaks the Phoenix/Supabase WebSocket protocol
+//  No external dependencies needed
+// ═══════════════════════════════════════════════════════════
+function createRealtimeClient(supabaseUrl, apiKey) {
+  const wsUrl = supabaseUrl.replace(/^https/, 'wss').replace(/^http/, 'ws')
+    + '/realtime/v1/websocket?apikey=' + apiKey + '&vsn=1.0.0';
+
+  let ws = null;
+  let channels = [];
+  let heartbeatTimer = null;
+  let ref = 0;
+  const nextRef = () => String(++ref);
+
+  function connect() {
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      // Start heartbeat every 25s
+      heartbeatTimer = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ topic:'phoenix', event:'heartbeat', payload:{}, ref: nextRef() }));
+        }
+      }, 25000);
+      // Re-subscribe all channels
+      channels.forEach(ch => ch._join());
+    };
+
+    ws.onmessage = (evt) => {
+      let msg;
+      try { msg = JSON.parse(evt.data); } catch { return; }
+      channels.forEach(ch => ch._receive(msg));
+    };
+
+    ws.onclose = () => {
+      clearInterval(heartbeatTimer);
+      // Notify channels
+      channels.forEach(ch => {
+        if (ch._statusCallback) ch._statusCallback('CLOSED');
+      });
+    };
+
+    ws.onerror = () => {
+      channels.forEach(ch => {
+        if (ch._statusCallback) ch._statusCallback('CHANNEL_ERROR');
+      });
+    };
+  }
+
+  function channel(topic) {
+    const fullTopic = 'realtime:' + topic;
+    const bindings  = [];
+    let   statusCb  = null;
+
+    const ch = {
+      _statusCallback: null,
+
+      on(event, filter, callback) {
+        bindings.push({ event, filter, callback });
+        return ch;
+      },
+
+      subscribe(callback) {
+        statusCb = callback;
+        ch._statusCallback = callback;
+        channels.push(ch);
+        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+          connect();
+        } else if (ws.readyState === WebSocket.OPEN) {
+          ch._join();
+        }
+        return ch;
+      },
+
+      unsubscribe() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            topic: fullTopic, event: 'phx_leave', payload: {}, ref: nextRef()
+          }));
+        }
+        channels = channels.filter(c => c !== ch);
+      },
+
+      _join() {
+        const pgBindings = bindings
+          .filter(b => b.event === 'postgres_changes')
+          .map(b => ({
+            event:  b.filter.event  || '*',
+            schema: b.filter.schema || 'public',
+            table:  b.filter.table,
+            filter: b.filter.filter,
+          }));
+
+        ws.send(JSON.stringify({
+          topic: fullTopic,
+          event: 'phx_join',
+          payload: {
+            config: {
+              broadcast:  { self: false },
+              presence:   { key: '' },
+              postgres_changes: pgBindings,
+            }
+          },
+          ref: nextRef(),
+        }));
+      },
+
+      _receive(msg) {
+        if (msg.topic !== fullTopic) return;
+
+        // Connection status
+        if (msg.event === 'phx_reply') {
+          const status = msg.payload?.status;
+          if (status === 'ok' && statusCb) statusCb('SUBSCRIBED');
+          if (status === 'error' && statusCb) statusCb('CHANNEL_ERROR');
+          return;
+        }
+
+        // Postgres change events
+        if (msg.event === 'postgres_changes') {
+          const data = msg.payload?.data || msg.payload;
+          bindings
+            .filter(b => b.event === 'postgres_changes')
+            .forEach(b => {
+              const evType = data.type || data.eventType;
+              if (b.filter.event === '*' || b.filter.event === evType) {
+                b.callback({
+                  eventType: evType,
+                  new: data.record    || data.new || {},
+                  old: data.old_record|| data.old || {},
+                  table: data.table,
+                  schema: data.schema,
+                });
+              }
+            });
+          return;
+        }
+
+        // System messages from newer Realtime versions
+        if (msg.event === 'system' && msg.payload?.message?.includes('subscribed')) {
+          if (statusCb) statusCb('SUBSCRIBED');
+        }
+      },
+    };
+
+    return ch;
+  }
+
+  return { channel };
+}
 // ═══════════════════════════════════════════════════════════
 //  BOOT & SYNC
 // ═══════════════════════════════════════════════════════════
@@ -509,7 +687,7 @@ async function boot() {
   try {
     await sbFetch(`${TABLE}?limit=1&select=id`);   // connection test
     await loadAll();
-    pollTimer = setInterval(poll, 5000);
+    subscribeRealtime();
   } catch(e) {
     console.error('boot error', e);
     setSyncState('err', '连接失败');
@@ -545,17 +723,160 @@ function applyRows(rows) {
   }
 }
 
-async function poll() {
-  try {
-    const rows = await sbFetch(`${TABLE}?select=*&order=tab,pos`);
-    const h = hashRows(rows);
-    if (h !== lastHash) {
-      lastHash = h;
-      applyRows(rows);
-      renderAll();
-      setSyncState('live', '已同步');
+// ═══════════════════════════════════════════════════════════
+//  SUPABASE REALTIME
+// ═══════════════════════════════════════════════════════════
+function subscribeRealtime() {
+  // Uses the Supabase Realtime JS client embedded below
+  const client = createRealtimeClient(SB_URL, SB_KEY);
+
+  realtimeChannel = client
+    .channel('cards_v2_changes')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: TABLE },
+      payload => handleRealtimeEvent(payload)
+    )
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        setSyncState('live', '实时同步');
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setSyncState('err', '连接断开');
+        // Fallback: re-attempt after 5s
+        setTimeout(() => {
+          setSyncState('syncing', '重连中…');
+          realtimeChannel?.unsubscribe();
+          subscribeRealtime();
+        }, 5000);
+      } else if (status === 'CLOSED') {
+        setSyncState('err', '已断开');
+      }
+    });
+}
+
+function handleRealtimeEvent(payload) {
+  const { eventType, new: newRow, old: oldRow } = payload;
+
+  if (eventType === 'INSERT') {
+    const tab = newRow.tab;
+    if (!db[tab]) return;
+    // Avoid duplicate if we just inserted it ourselves
+    if (db[tab].find(c => c.id === newRow.id)) return;
+    db[tab].push({
+      id: newRow.id, name: newRow.name, img: newRow.img || '',
+      pos: newRow.pos || 0,
+      grade_a: newRow.grade_a || null, note_a: newRow.note_a || '',
+      grade_b: newRow.grade_b || null, note_b: newRow.note_b || '',
+    });
+    // Sort by pos
+    db[tab].sort((a, b) => a.pos - b.pos);
+    renderAll();
+    setSyncState('live', '实时同步');
+    return;
+  }
+
+  if (eventType === 'DELETE') {
+    const id = oldRow.id;
+    TABS.forEach(t => { db[t.id] = db[t.id].filter(c => c.id !== id); });
+    renderAll();
+    setSyncState('live', '实时同步');
+    return;
+  }
+
+  if (eventType === 'UPDATE') {
+    const r = newRow;
+    // Find card in db
+    let card = null;
+    for (const t of TABS) {
+      card = db[t.id].find(c => c.id === r.id);
+      if (card) break;
     }
-  } catch { /* silent */ }
+    if (!card) return;
+
+    card.grade_a = r.grade_a || null;
+    card.note_a  = r.note_a  || '';
+    card.grade_b = r.grade_b || null;
+    card.note_b  = r.note_b  || '';
+    card.name    = r.name;
+    card.img     = r.img || '';
+
+    // Smart DOM patch — don't destroy focused textarea
+    patchCardDom();
+    renderTabs();
+    renderStats();
+    renderProgress();
+    setSyncState('live', '实时同步');
+    return;
+  }
+}
+
+// Patch grade ribbons, border colours, and peer badges in-place
+// Skips any card whose textarea currently has focus
+function patchCardDom() {
+  const gKey  = 'grade_' + activeUser;
+  const pgKey = 'grade_' + (activeUser === 'a' ? 'b' : 'a');
+  const peerLabel = activeUser === 'a' ? 'B' : 'A';
+  const focusedTextarea = document.activeElement?.classList.contains('note-box')
+    ? document.activeElement : null;
+
+  const cards = filtered();
+  const cardEls = document.querySelectorAll('#cardGrid .ci');
+
+  cards.forEach((c, idx) => {
+    const el = cardEls[idx];
+    if (!el) return;
+
+    // Skip entirely if this card's textarea is focused
+    if (focusedTextarea && el.contains(focusedTextarea)) return;
+
+    const gc = c[gKey] ? GC[c[gKey]] : null;
+    const gf = c[gKey] ? GF[c[gKey]] : null;
+    const pg = c[pgKey];
+
+    // Border + data-g
+    if (gc) {
+      el.dataset.g = c[gKey];
+      el.style.setProperty('--gc', gc);
+    } else {
+      delete el.dataset.g;
+      el.style.removeProperty('--gc');
+    }
+
+    // Grade ribbon
+    const thumb = el.querySelector('.ci-thumb');
+    let ribbon = thumb.querySelector('.ci-ribbon');
+    if (c[gKey]) {
+      if (!ribbon) {
+        ribbon = document.createElement('div');
+        ribbon.className = 'ci-ribbon';
+        thumb.appendChild(ribbon);
+      }
+      ribbon.style.background = gc;
+      ribbon.style.color = gf;
+      ribbon.textContent = c[gKey];
+    } else {
+      ribbon?.remove();
+    }
+
+    // Peer badge
+    let peer = thumb.querySelector('.ci-peer');
+    if (pg) {
+      if (!peer) {
+        peer = document.createElement('div');
+        peer.className = 'ci-peer';
+        thumb.appendChild(peer);
+      }
+      peer.innerHTML = `<div class="ci-peer-badge" style="background:${GC[pg]};color:${GF[pg]}">${pg}</div>
+        <span class="ci-peer-name">${peerLabel}</span>`;
+    } else {
+      peer?.remove();
+    }
+
+    // Grade buttons
+    const gbs = el.querySelectorAll('.gb');
+    gbs.forEach((btn, i) => {
+      btn.classList.toggle('sel', G[i] === c[gKey]);
+    });
+  });
 }
 
 function hashRows(rows) {
@@ -614,7 +935,7 @@ function updateNote(id, val) {
   if (!c) return;
   c['note_' + activeUser] = val;
   clearTimeout(noteTimer);
-  noteTimer = setTimeout(() => saveCard(c), 900);
+  noteTimer = setTimeout(() => saveCard(c), 1500);
 }
 
 async function saveCard(card) {
@@ -986,17 +1307,17 @@ function renderCards() {
     const pg = c[pgKey];
 
     return `<div class="ci" ${gc ? `data-g="${c[gKey]}" style="--gc:${gc}"` : ''}
-      ondblclick="editImg('${c.id}')" title="双击修改图片">
+      ondblclick="editImg('${c.id}')" title="单击放大卡图 · 双击修改图片 URL">
       <button class="ci-del" onclick="delCard('${c.id}')">×</button>
       <div class="ci-thumb">
         ${c.img
-          ? `<img src="${c.img}" alt="${c.name}"
+          ? `<img src="${c.img}" alt="${c.name}" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in"
                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-             <div class="ci-ph" style="display:none">
+             <div class="ci-ph" style="display:none" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in">
                <div class="ci-ph-ico">🃏</div>
                <div class="ci-ph-name">${c.name}</div>
              </div>`
-          : `<div class="ci-ph">
+          : `<div class="ci-ph" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in">
                <div class="ci-ph-ico">🃏</div>
                <div class="ci-ph-name">${c.name}</div>
              </div>`
@@ -1151,6 +1472,100 @@ document.getElementById('inImg').addEventListener('keydown',  e => { if(e.key===
 document.getElementById('importOv').addEventListener('click', e => { if(e.target===e.currentTarget) closeImport(); });
 document.getElementById('cmpOv').addEventListener('click',   e => { if(e.target===e.currentTarget) closeCmp(); });
 
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+// S/A/B/C/D → grade focused card | Escape → clear grade | ← → → navigate cards
+let focusedCardId = null;
+
+document.addEventListener('keydown', e => {
+  // Don't fire when typing in an input / textarea
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  // Don't fire when a modal is open
+  if (document.querySelector('.overlay.open')) return;
+
+  const key = e.key.toUpperCase();
+
+  if (G.includes(key) && focusedCardId) {
+    e.preventDefault();
+    setGrade(focusedCardId, key);
+    return;
+  }
+
+  if (e.key === 'Escape' && focusedCardId) {
+    // Clear grade
+    const c = findCard(focusedCardId);
+    if (c) { c['grade_' + activeUser] = null; renderAll(); saveCard(c); }
+    return;
+  }
+
+  if (e.key === 'Escape') { closeLightbox(); return; }
+
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    navigateCard(e.key === 'ArrowRight' ? 1 : -1);
+  }
+});
+
+function setFocusedCard(id) {
+  // Remove previous highlight
+  document.querySelectorAll('.ci.kb-focus').forEach(el => el.classList.remove('kb-focus'));
+  focusedCardId = id;
+  if (!id) return;
+  const cards = filtered();
+  const idx   = cards.findIndex(c => c.id === id);
+  const el    = document.querySelectorAll('#cardGrid .ci')[idx];
+  if (el) {
+    el.classList.add('kb-focus');
+    el.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function navigateCard(dir) {
+  const cards = filtered();
+  if (!cards.length) return;
+  const idx = focusedCardId ? cards.findIndex(c => c.id === focusedCardId) : -1;
+  const next = Math.max(0, Math.min(cards.length - 1, idx + dir));
+  setFocusedCard(cards[next].id);
+}
+
+// Click on card body sets keyboard focus
+document.getElementById('cardGrid').addEventListener('click', e => {
+  const ci = e.target.closest('.ci');
+  if (ci) {
+    // Find card id from delete button or grade buttons
+    const delBtn = ci.querySelector('.ci-del');
+    if (delBtn) {
+      // Extract id from onclick attr
+      const m = delBtn.getAttribute('onclick').match(/'([^']+)'/);
+      if (m) setFocusedCard(m[1]);
+    }
+  }
+});
+
+// ── Lightbox ─────────────────────────────────────────────────────────────
+function openLightbox(evt, id) {
+  evt.stopPropagation(); // prevent ondblclick from firing
+  const c = findCard(id);
+  if (!c) return;
+  const content = document.getElementById('lbContent');
+  if (c.img) {
+    content.innerHTML = `<img class="lb-img" src="${c.img}" alt="${c.name}"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="lb-ph" style="display:none">
+        <div class="lb-ph-ico">🃏</div>
+      </div>`;
+  } else {
+    content.innerHTML = `<div class="lb-ph"><div class="lb-ph-ico">🃏</div></div>`;
+  }
+  document.getElementById('lbName').textContent = c.name;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox(evt) {
+  if (evt && evt.target !== evt.currentTarget && !evt.target.classList.contains('lb-close')) return;
+  document.getElementById('lightbox').classList.remove('open');
+}
+
 // ═══════════════════════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════════════════════
@@ -1158,9 +1573,10 @@ boot();
 </script>
 
 <!--
-  ═══ Supabase 建表 SQL（在 Supabase SQL Editor 执行一次）═══
+  ═══ Supabase 设置 SQL（在 Supabase SQL Editor 执行一次）═══
 
-  CREATE TABLE public.cards_v2 (
+  -- 1. 建表（如果已存在则跳过）
+  CREATE TABLE IF NOT EXISTS public.cards_v2 (
     id       text PRIMARY KEY,
     tab      text NOT NULL,
     name     text NOT NULL,
@@ -1172,12 +1588,14 @@ boot();
     note_b   text
   );
 
-  -- 关闭 RLS（开发/私有使用）
+  -- 2. 关闭 RLS（私有使用）
   ALTER TABLE public.cards_v2 DISABLE ROW LEVEL SECURITY;
 
-  -- 或者保留 RLS 并添加匿名读写策略：
-  -- CREATE POLICY "anon all" ON public.cards_v2
-  --   FOR ALL TO anon USING (true) WITH CHECK (true);
+  -- 3. 开启 Realtime（必须执行，否则实时同步不工作）
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.cards_v2;
+
+  -- 验证是否已加入：
+  -- SELECT * FROM pg_publication_tables WHERE pubname = 'supabase_realtime';
 -->
 
 </body>
