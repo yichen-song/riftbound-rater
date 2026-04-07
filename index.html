@@ -10,22 +10,50 @@
 <body>
 <div class="app">
 
+<!-- ── 登录界面 ── -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">RIFTBOUND<small>CARD RATER</small></div>
+    <div class="auth-sub">评级工具 · 请登录以继续</div>
+    <div class="mf">
+      <label>邮箱</label>
+      <input type="email" id="authEmail" placeholder="your@email.com" autocomplete="email" />
+    </div>
+    <div class="mf">
+      <label>密码</label>
+      <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <div class="auth-err" id="authErr"></div>
+    <button class="btn btn-gold" id="authBtn" onclick="doLogin()" style="width:100%;margin-top:6px">登录</button>
+  </div>
+</div>
+
+<!-- ── 主界面 ── -->
+<div class="main-screen" id="mainScreen" style="display:none">
+
 <!-- Header -->
 <header>
   <div class="logo">RIFTBOUND<small>CARD RATER</small></div>
 
+  <!-- 赛制切换 -->
   <div class="header-center">
-    <span style="font-size:11px;color:var(--text-dim)">视角</span>
-    <div class="user-toggle" id="userToggle">
-      <button class="user-btn active" id="uBtnA" onclick="switchUser('A')">玩家 A</button>
-      <button class="user-btn"        id="uBtnB" onclick="switchUser('B')">玩家 B</button>
+    <span class="hc-label">赛制</span>
+    <div class="format-toggle" id="formatToggle">
+      <button class="fmt-btn active" id="fBtnC" onclick="switchFormat('constructed')">构筑</button>
+      <button class="fmt-btn"        id="fBtnL" onclick="switchFormat('limited')">限制</button>
     </div>
   </div>
 
   <div class="header-right">
+    <!-- 同步状态 -->
     <div class="sync-pill">
       <div class="sync-dot" id="syncDot"></div>
       <span id="syncLabel">连接中…</span>
+    </div>
+    <!-- 当前用户 -->
+    <div class="user-pill" id="userPill">
+      <span class="user-pill-name" id="userPillName">—</span>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">退出</button>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="openImport()">导入卡牌</button>
     <button class="btn btn-ghost btn-sm" onclick="openCompare()">⚖ 对比</button>
@@ -58,28 +86,10 @@
       <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
     </div>
 
+    <!-- 赛制说明（由 JS 按当前赛制动态渲染） -->
     <div class="sb-title" style="padding:10px 13px 0">评级说明</div>
-    <div class="legend">
-      <div class="leg-row">
-        <div class="leg-badge" style="background:var(--s-bg);color:#fff">S</div>
-        <div class="leg-text"><b>构筑核心</b>围绕此卡建立整副牌的策略支柱</div>
-      </div>
-      <div class="leg-row">
-        <div class="leg-badge" style="background:var(--a-bg);color:#fff">A</div>
-        <div class="leg-text"><b>色组首选</b>对应色组中几乎必带的高强度单卡</div>
-      </div>
-      <div class="leg-row">
-        <div class="leg-badge" style="background:var(--b-bg);color:#fff">B</div>
-        <div class="leg-text"><b>联动良好</b>联动匹配或特定策略下值得优先选取</div>
-      </div>
-      <div class="leg-row">
-        <div class="leg-badge" style="background:var(--c-bg);color:#fff">C</div>
-        <div class="leg-text"><b>可用补位</b>可接受的轮抽补充，无更好选择时考虑</div>
-      </div>
-      <div class="leg-row">
-        <div class="leg-badge" style="background:var(--d-bg);color:var(--d-fg)">D</div>
-        <div class="leg-text"><b>弃用</b>强度不足，几乎不值得选入任何构筑</div>
-      </div>
+    <div class="legend" id="legendPanel">
+      <!-- 由 renderLegend() 填充 -->
     </div>
 
     <div class="sb-stats" id="sbStats"></div>
@@ -94,7 +104,9 @@
   <!-- Compare -->
   <div id="cmpArea" class="cmp-area" style="display:none"></div>
 </div>
-</div>
+
+</div><!-- /main-screen -->
+</div><!-- /app -->
 
 <!-- ── Import Modal ── -->
 <div class="overlay" id="importOv">
@@ -102,7 +114,7 @@
     <div class="modal-title">导入卡牌</div>
     <div class="import-modes">
       <div class="imode-btn active" id="iModeJson" onclick="switchImportMode('json')">📄 JSON 文件</div>
-      <div class="imode-btn" id="iModeText"         onclick="switchImportMode('text')">✏ 手动文本</div>
+      <div class="imode-btn"         id="iModeText" onclick="switchImportMode('text')">✏ 手动文本</div>
     </div>
 
     <!-- JSON file mode -->
@@ -112,40 +124,28 @@
         <input type="file" id="jsonFile" accept=".json"
           style="background:none;border:none;padding:0;color:var(--text-mid);font-size:12px"
           onchange="previewJson()" />
-        <div class="hint">支持官网爬取格式：<b>{"tab名": [{"name":"…","img":"…"}]}</b><br>
-          已有卡牌（同名同页）自动跳过，不会覆盖现有评级。</div>
-      </div>
-      <div class="mf">
-        <label>导入目标</label>
-        <select id="jsonTarget">
-          <option value="all">按 JSON 中的分页分别导入</option>
-          <option value="special">传奇 / 专法</option>
-          <option value="red">红</option>
-          <option value="green">绿</option>
-          <option value="blue">蓝</option>
-          <option value="orange">橙</option>
-          <option value="purple">紫</option>
-          <option value="yellow">黄</option>
-        </select>
+        <div class="hint">
+          支持格式：<b>{"tab名": [{"name":"…","img":"…","card_type":"…","domains":["炽烈"]}]}</b><br>
+          已有卡牌（同名同 Tab）自动跳过，不覆盖现有评级。
+        </div>
       </div>
       <div class="import-result" id="jsonResult"></div>
       <div class="m-btns">
         <button class="btn btn-ghost" onclick="closeImport()">取消</button>
-        <button class="btn btn-gold" onclick="doJsonImport()">导入</button>
+        <button class="btn btn-gold"  onclick="doJsonImport()">导入</button>
       </div>
     </div>
 
     <!-- Text mode -->
     <div class="imode-panel" id="iPanelText">
       <div class="mf">
-        <label>每行一张</label>
+        <label>每行一张（导入到当前 Tab）</label>
         <textarea id="bulkTxt" placeholder="月之降临&#10;https://example.com/card.png&#10;皎月护卫|https://example.com/card2.png"></textarea>
-        <div class="hint">格式：<b>卡名</b> / <b>图片URL</b> / <b>卡名|图片URL</b><br>
-          导入到当前选中页签，重复卡名自动跳过。</div>
+        <div class="hint">格式：<b>卡名</b> / <b>图片URL</b> / <b>卡名|图片URL</b>，重复卡名自动跳过。</div>
       </div>
       <div class="m-btns">
         <button class="btn btn-ghost" onclick="closeImport()">取消</button>
-        <button class="btn btn-gold" onclick="doBulkImport()">导入</button>
+        <button class="btn btn-gold"  onclick="doBulkImport()">导入</button>
       </div>
     </div>
   </div>
@@ -155,22 +155,33 @@
 <div class="overlay" id="cmpOv">
   <div class="modal">
     <div class="modal-title">⚖ 评级对比</div>
-    <div class="hint" style="margin-bottom:12px">实时读取两位玩家在 Supabase 中的评级，自动对比差异。</div>
+    <div class="hint" style="margin-bottom:12px">
+      展示所有玩家在当前赛制下的评级，高亮显示差异项。
+    </div>
+    <div class="mf">
+      <label>对比赛制</label>
+      <select id="cmpFormat">
+        <option value="constructed">构筑赛</option>
+        <option value="limited">限制赛</option>
+      </select>
+    </div>
     <div class="m-btns">
       <button class="btn btn-ghost" onclick="closeCmp()">关闭</button>
-      <button class="btn btn-gold" onclick="startCompare()">开始对比</button>
+      <button class="btn btn-gold"  onclick="startCompare()">开始对比</button>
     </div>
   </div>
 </div>
 
-<!-- Lightbox -->
+<!-- ── Lightbox ── -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
   <div class="lb-inner" id="lbInner">
     <button class="lb-close" onclick="closeLightbox()">×</button>
     <div id="lbContent"></div>
-    <div class="lb-name" id="lbName"></div>
+    <div class="lb-name"   id="lbName"></div>
+    <div class="lb-meta"   id="lbMeta"></div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
 
 <script src="app.js"></script>
