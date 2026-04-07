@@ -619,13 +619,14 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 async function addCard() {
   const name      = document.getElementById('inName').value.trim();
   const img       = document.getElementById('inImg').value.trim();
-  const card_type = document.getElementById('inCardType').value;  // 'legend'|'battlefield'|'spell'
-  // domains：从多选 checkbox 收集（只在 card_type 为普通牌时有效）
+  const card_type = document.getElementById('inCardType').value;  // 'legend'|'battlefield'|'unit'|'gear'|'spell'|'rune'|...
+  // domains：legend / battlefield 无特性，其余类型必须至少选一个
   const domains   = card_type === 'legend' || card_type === 'battlefield'
     ? []
     : Array.from(document.querySelectorAll('#inDomains input:checked')).map(el => el.value);
 
   if (!name) { toast('请填入卡牌名称'); return; }
+  if (!card_type) { toast('请选择卡牌类型'); return; }
   if (card_type !== 'legend' && card_type !== 'battlefield' && domains.length === 0) {
     toast('请至少选择一个特性，或选择传奇 / 战场类型'); return;
   }
