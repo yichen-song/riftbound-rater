@@ -4,45 +4,92 @@
 const SB_URL = 'https://vepqjryrhvuehwemabqu.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlcHFqcnlyaHZ1ZWh3ZW1hYnF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjA2MjYsImV4cCI6MjA5MDQzNjYyNn0.8ZWqTUwEQX1zFwTCLx7eqwfocDmw5DId2rrxoxDjrPk';
 
-const TABLE = 'cards_v2';
-
 // ═══════════════════════════════════════════════════════════
-//  TAB CONFIG
+//  TAB CONFIG  （由 card_type + domains 推导，不存 tab 字段）
 // ═══════════════════════════════════════════════════════════
 const TABS = [
-  { id:'special', label:'传奇 / 专法', color:'#c9a84c' },
-  { id:'red',     label:'红',          color:'#e05252' },
-  { id:'green',   label:'绿',          color:'#52b96e' },
-  { id:'blue',    label:'蓝',          color:'#5b9fe0' },
-  { id:'orange',  label:'橙',          color:'#e07d30' },
-  { id:'purple',  label:'紫',          color:'#9b6de0' },
-  { id:'yellow',  label:'黄',          color:'#d4b935' },
+  { id:'legends',     label:'传奇',  color:'#c9a84c', domain: null },
+  { id:'red',         label:'炽烈',  color:'#e05252', domain:'炽烈' },
+  { id:'green',       label:'翠意',  color:'#52b96e', domain:'翠意' },
+  { id:'blue',        label:'灵光',  color:'#5b9fe0', domain:'灵光' },
+  { id:'orange',      label:'摧破',  color:'#e07d30', domain:'摧破' },
+  { id:'purple',      label:'混沌',  color:'#9b6de0', domain:'混沌' },
+  { id:'yellow',      label:'序理',  color:'#d4b935', domain:'序理' },
+  { id:'battlefield', label:'战场',  color:'#7a8599', domain: null },
 ];
 
-const G  = ['S','A','B','C','D'];
-const GC = { S:'#c0392b', A:'#d4820a', B:'#1e8449', C:'#1a6fa8', D:'#3d4455' };
-const GF = { S:'#fff', A:'#fff', B:'#fff', C:'#fff', D:'#9aa' };
-const GL = { S:'构筑核心', A:'色组首选', B:'联动良好', C:'可用补位', D:'弃用' };
+// Tab 过滤：legend 强制归「传奇」，battlefield 归「战场」，其余按 domains
+function getCardsForTab(tabId, cards) {
+  const tab = TABS.find(t => t.id === tabId);
+  if (!tab) return [];
+  if (tabId === 'legends')     return cards.filter(c => c.card_type === 'legend');
+  if (tabId === 'battlefield') return cards.filter(c => c.card_type === 'battlefield');
+  return cards.filter(c =>
+    c.card_type !== 'legend' &&
+    c.card_type !== 'battlefield' &&
+    Array.isArray(c.domains) && c.domains.includes(tab.domain)
+  );
+}
+
+// ── 评级档位 ─────────────────────────────────────────────────
+const G  = ['S','A','B','C','D','E'];
+const GC = { S:'#c0392b', A:'#d4820a', B:'#1e8449', C:'#1a6fa8', D:'#3d4455', E:'#1a1a22' };
+const GF = { S:'#fff',    A:'#fff',    B:'#fff',    C:'#fff',    D:'#9aa',    E:'#555e6e' };
+const GRADE_VALUE = { S:5, A:4, B:3, C:2, D:1, E:0 };
+
+// 评级说明：构筑 / 限制 各一套
+const GL = {
+  constructed: {
+    S:'构筑核心，能撑起整个套牌策略',
+    A:'强力单卡，几乎必带',
+    B:'有价值的支援，特定构筑中优先',
+    C:'边缘可用，有更好选择时跳过',
+    D:'弱，只有极特殊情况考虑',
+    E:'不进任何构筑',
+  },
+  limited: {
+    S:'首选必拿，能独自左右胜负',
+    A:'高优先级，大多数情况下应该拿',
+    B:'可靠补充，多数套牌能用上',
+    C:'可接受的填充，无更好选择时考虑',
+    D:'弱，很少值得选取',
+    E:'几乎不拿',
+  },
+};
+
+// 特性 → 颜色映射（用于 ci-tag）
+const DOMAIN_COLOR = {
+  '炽烈':'#e05252','翠意':'#52b96e','灵光':'#5b9fe0',
+  '摧破':'#e07d30','混沌':'#9b6de0','序理':'#d4b935',
+};
 
 // ═══════════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════════
-// db[tab] = [{ id, name, img, pos, grade_a, note_a, grade_b, note_b }]
-let db = {};
-TABS.forEach(t => db[t.id] = []);
+// allCards = [{ id, name, img, pos, set_code, card_number, card_type, domains }]
+let allCards  = [];
+// sets = { 'UNL': '破限', ... }
+let sets      = {};
+// grades[card_id][user_id][format] = { grade, comment }
+let grades    = {};
+// notes[card_id][user_id] = { note }
+let notes     = {};
+// allUsers = [{ id, display_name }]（从评级数据中收集）
+let allUsers  = [];
 
-let activeUser   = 'a';   // 'a' | 'b'（第二步重构前保留，兼容现有渲染函数）
-let activeTab    = 'special';
+let activeTab    = 'legends';
+let activeFormat = 'constructed';   // 'constructed' | 'limited'
 let activeFilter = 'ALL';
 let searchQuery  = '';
+let commentTimer = null;
 let noteTimer    = null;
 let realtimeChannel = null;
-let lastHash     = '';
 let isLoading    = true;
+let focusedCardId = null;
 
 // ── Auth state ───────────────────────────────────────────────
 // currentUser = { id, email, display_name, access_token, refresh_token, expires_at }
-let currentUser  = null;
+let currentUser = null;
 
 // ═══════════════════════════════════════════════════════════
 //  SUPABASE HELPERS
@@ -64,13 +111,14 @@ async function sbFetch(path, method = 'GET', body = null) {
   return r.json();
 }
 
-// Upsert: insert or update on conflict of id
-async function sbUpsert(rows) {
+// Upsert（通用）：传入表名和行数据（单行或数组）
+async function sbUpsert(table, rows) {
   const hdrs = { ...SB_HDR(), 'Prefer': 'resolution=merge-duplicates,return=minimal' };
-  const r = await fetch(SB_URL + '/rest/v1/' + TABLE, {
-    method: 'POST', headers: hdrs, body: JSON.stringify(rows)
+  const r = await fetch(SB_URL + '/rest/v1/' + table, {
+    method: 'POST', headers: hdrs,
+    body: JSON.stringify(Array.isArray(rows) ? rows : [rows]),
   });
-  if (!r.ok) throw new Error(`upsert ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw new Error(`upsert(${table}) ${r.status}: ${await r.text()}`);
 }
 
 
@@ -93,13 +141,11 @@ function createRealtimeClient(supabaseUrl, apiKey) {
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      // Start heartbeat every 25s
       heartbeatTimer = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ topic:'phoenix', event:'heartbeat', payload:{}, ref: nextRef() }));
         }
       }, 25000);
-      // Re-subscribe all channels
       channels.forEach(ch => ch._join());
     };
 
@@ -111,16 +157,11 @@ function createRealtimeClient(supabaseUrl, apiKey) {
 
     ws.onclose = () => {
       clearInterval(heartbeatTimer);
-      // Notify channels
-      channels.forEach(ch => {
-        if (ch._statusCallback) ch._statusCallback('CLOSED');
-      });
+      channels.forEach(ch => { if (ch._statusCallback) ch._statusCallback('CLOSED'); });
     };
 
     ws.onerror = () => {
-      channels.forEach(ch => {
-        if (ch._statusCallback) ch._statusCallback('CHANNEL_ERROR');
-      });
+      channels.forEach(ch => { if (ch._statusCallback) ch._statusCallback('CHANNEL_ERROR'); });
     };
   }
 
@@ -151,9 +192,7 @@ function createRealtimeClient(supabaseUrl, apiKey) {
 
       unsubscribe() {
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            topic: fullTopic, event: 'phx_leave', payload: {}, ref: nextRef()
-          }));
+          ws.send(JSON.stringify({ topic: fullTopic, event: 'phx_leave', payload: {}, ref: nextRef() }));
         }
         channels = channels.filter(c => c !== ch);
       },
@@ -167,70 +206,55 @@ function createRealtimeClient(supabaseUrl, apiKey) {
             table:  b.filter.table,
             filter: b.filter.filter,
           }));
-
         ws.send(JSON.stringify({
-          topic: fullTopic,
-          event: 'phx_join',
-          payload: {
-            config: {
-              broadcast:  { self: false },
-              presence:   { key: '' },
-              postgres_changes: pgBindings,
-            }
-          },
+          topic: fullTopic, event: 'phx_join',
+          payload: { config: {
+            broadcast: { self: false }, presence: { key: '' },
+            postgres_changes: pgBindings,
+          }},
           ref: nextRef(),
         }));
       },
 
       _receive(msg) {
         if (msg.topic !== fullTopic) return;
-
-        // Connection status
         if (msg.event === 'phx_reply') {
           const status = msg.payload?.status;
-          if (status === 'ok' && statusCb) statusCb('SUBSCRIBED');
+          if (status === 'ok'    && statusCb) statusCb('SUBSCRIBED');
           if (status === 'error' && statusCb) statusCb('CHANNEL_ERROR');
           return;
         }
-
-        // Postgres change events
         if (msg.event === 'postgres_changes') {
           const data = msg.payload?.data || msg.payload;
-          bindings
-            .filter(b => b.event === 'postgres_changes')
-            .forEach(b => {
-              const evType = data.type || data.eventType;
-              if (b.filter.event === '*' || b.filter.event === evType) {
-                b.callback({
-                  eventType: evType,
-                  new: data.record    || data.new || {},
-                  old: data.old_record|| data.old || {},
-                  table: data.table,
-                  schema: data.schema,
-                });
-              }
-            });
+          bindings.filter(b => b.event === 'postgres_changes').forEach(b => {
+            const evType = data.type || data.eventType;
+            if (b.filter.event === '*' || b.filter.event === evType) {
+              b.callback({
+                eventType: evType,
+                new: data.record     || data.new || {},
+                old: data.old_record || data.old || {},
+                table: data.table, schema: data.schema,
+              });
+            }
+          });
           return;
         }
-
-        // System messages from newer Realtime versions
         if (msg.event === 'system' && msg.payload?.message?.includes('subscribed')) {
           if (statusCb) statusCb('SUBSCRIBED');
         }
       },
     };
-
     return ch;
   }
 
   return { channel };
 }
+
 // ═══════════════════════════════════════════════════════════
 //  AUTH
 // ═══════════════════════════════════════════════════════════
-const SESSION_KEY = 'rb_session';   // localStorage key
+const SESSION_KEY = 'rb_session';
 
-// ── 界面切换 ─────────────────────────────────────────────────
 function showAuthScreen() {
   document.getElementById('authScreen').style.display = '';
   document.getElementById('mainScreen').style.display = 'none';
@@ -239,21 +263,17 @@ function showAuthScreen() {
 function showMainScreen() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainScreen').style.display = '';
-  // 显示用户名
   const name = currentUser?.display_name || currentUser?.email || '—';
   document.getElementById('userPillName').textContent = name;
 }
 
-// ── 登录 ─────────────────────────────────────────────────────
 async function doLogin() {
   const email    = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   const errEl    = document.getElementById('authErr');
   const btn      = document.getElementById('authBtn');
-
   errEl.textContent = '';
   if (!email || !password) { errEl.textContent = '请填写邮箱和密码'; return; }
-
   btn.classList.add('loading'); btn.textContent = '登录中…';
   try {
     const r = await fetch(SB_URL + '/auth/v1/token?grant_type=password', {
@@ -266,7 +286,6 @@ async function doLogin() {
     applySession(data);
     saveSession(data);
     showMainScreen();
-    // 登录成功后正式启动
     setSyncState('syncing', '连接中…');
     showSkeleton();
     await loadAll();
@@ -277,7 +296,6 @@ async function doLogin() {
   btn.classList.remove('loading'); btn.textContent = '登录';
 }
 
-// Enter 键触发登录
 document.addEventListener('DOMContentLoaded', () => {
   ['authEmail','authPassword'].forEach(id => {
     document.getElementById(id)?.addEventListener('keydown', e => {
@@ -286,9 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ── 登出 ─────────────────────────────────────────────────────
 async function doLogout() {
-  // 通知 Supabase 撤销 token（可选，失败不影响本地登出）
   try {
     await fetch(SB_URL + '/auth/v1/logout', {
       method: 'POST',
@@ -299,17 +315,14 @@ async function doLogout() {
   realtimeChannel?.unsubscribe();
   realtimeChannel = null;
   currentUser = null;
-  // 重置数据，回到登录界面
-  TABS.forEach(t => db[t.id] = []);
+  allCards = []; grades = {}; notes = {}; allUsers = [];
   isLoading = true;
   showAuthScreen();
   document.getElementById('authPassword').value = '';
   document.getElementById('authErr').textContent = '';
 }
 
-// ── Session 持久化 ────────────────────────────────────────────
 function applySession(data) {
-  // Supabase /token 响应：{ access_token, refresh_token, expires_in, user: {...} }
   currentUser = {
     id:            data.user.id,
     email:         data.user.email,
@@ -339,16 +352,11 @@ async function restoreSession() {
   let saved;
   try { saved = JSON.parse(localStorage.getItem(SESSION_KEY)); } catch {}
   if (!saved?.access_token) return false;
-
-  // 检查 token 是否仍有效（提前 60s 刷新）
   const expiresAt = saved.expires_at ?? (Date.now() + (saved.expires_in ?? 3600) * 1000);
   if (Date.now() < expiresAt - 60_000) {
-    // 仍有效，直接恢复
     applySession({ ...saved, expires_in: Math.floor((expiresAt - Date.now()) / 1000) });
     return true;
   }
-
-  // 已过期，用 refresh_token 续期
   return await refreshSession(saved.refresh_token);
 }
 
@@ -364,7 +372,6 @@ async function refreshSession(refreshToken) {
     const data = await r.json();
     applySession(data);
     saveSession(data);
-    // 设置下次自动续期（提前 2 分钟）
     const delay = ((data.expires_in ?? 3600) - 120) * 1000;
     if (delay > 0) setTimeout(() => refreshSession(currentUser?.refresh_token), delay);
     return true;
@@ -378,19 +385,12 @@ async function refreshSession(refreshToken) {
 //  BOOT & SYNC
 // ═══════════════════════════════════════════════════════════
 async function boot() {
-  // 1. 尝试从 localStorage 恢复 session
   const restored = await restoreSession();
-  if (!restored) {
-    // 未登录 → 显示登录界面，不加载数据
-    showAuthScreen();
-    return;
-  }
-  // 2. 已登录 → 显示主界面并加载数据
+  if (!restored) { showAuthScreen(); return; }
   showMainScreen();
   setSyncState('syncing', '连接中…');
   showSkeleton();
   try {
-    await sbFetch(`${TABLE}?limit=1&select=id`);
     await loadAll();
     subscribeRealtime();
   } catch(e) {
@@ -401,12 +401,21 @@ async function boot() {
   }
 }
 
+// ── 加载全部数据（三张表并发）────────────────────────────────
 async function loadAll() {
   setSyncState('syncing', '加载中…');
   try {
-    const rows = await sbFetch(`${TABLE}?select=*&order=tab,pos`);
-    applyRows(rows);
-    lastHash = hashRows(rows);
+    const [cardRows, gradeRows, noteRows, setRows] = await Promise.all([
+      sbFetch('cards?select=*&order=pos'),
+      sbFetch('card_grades?select=*'),
+      sbFetch('card_notes?select=*'),
+      sbFetch('sets?select=*'),
+    ]);
+    applyCards(cardRows   || []);
+    applySets(setRows     || []);
+    applyGrades(gradeRows || []);
+    applyNotes(noteRows   || []);
+    collectUsers(gradeRows || [], noteRows || []);
     setSyncState('live', '已同步');
   } catch(e) {
     console.error('load error', e);
@@ -416,260 +425,333 @@ async function loadAll() {
   renderAll();
 }
 
-function applyRows(rows) {
-  TABS.forEach(t => db[t.id] = []);
+function applyCards(rows) {
+  allCards = rows.map(r => ({
+    id:          r.id,
+    name:        r.name,
+    img:         r.img || '',
+    pos:         r.pos || 0,
+    set_code:    r.set_code    || '',
+    card_number: r.card_number ?? null,
+    card_type:   r.card_type   || '',
+    domains:     Array.isArray(r.domains) ? r.domains : [],
+  }));
+}
+
+function applySets(rows) {
+  sets = {};
+  for (const r of rows) sets[r.code] = r.name;
+}
+
+function applyGrades(rows) {
+  grades = {};
   for (const r of rows) {
-    if (!db[r.tab]) continue;
-    db[r.tab].push({
-      id: r.id, name: r.name, img: r.img || '', pos: r.pos || 0,
-      grade_a: r.grade_a || null, note_a: r.note_a || '',
-      grade_b: r.grade_b || null, note_b: r.note_b || '',
-    });
+    if (!grades[r.card_id]) grades[r.card_id] = {};
+    if (!grades[r.card_id][r.user_id]) grades[r.card_id][r.user_id] = {};
+    grades[r.card_id][r.user_id][r.format] = {
+      grade:   r.grade   || null,
+      comment: r.comment || '',
+    };
   }
 }
 
+function applyNotes(rows) {
+  notes = {};
+  for (const r of rows) {
+    if (!notes[r.card_id]) notes[r.card_id] = {};
+    notes[r.card_id][r.user_id] = { note: r.note || '' };
+  }
+}
+
+// 从评级/备注数据中收集已知用户（display_name 在第三步多人评级时补全）
+function collectUsers(gradeRows, noteRows) {
+  const seen = new Set(allUsers.map(u => u.id));
+  for (const r of [...gradeRows, ...noteRows]) {
+    if (!seen.has(r.user_id)) {
+      seen.add(r.user_id);
+      allUsers.push({ id: r.user_id, display_name: r.user_id.slice(0, 6) });
+    }
+  }
+  // 确保自己在列表中且 display_name 正确
+  const self = allUsers.find(u => u.id === currentUser.id);
+  if (self) self.display_name = currentUser.display_name;
+  else allUsers.push({ id: currentUser.id, display_name: currentUser.display_name });
+}
+
+// ── 快捷访问器 ────────────────────────────────────────────────
+function myGrade(cardId, format)   { return grades[cardId]?.[currentUser.id]?.[format ?? activeFormat]?.grade   || null; }
+function myComment(cardId, format) { return grades[cardId]?.[currentUser.id]?.[format ?? activeFormat]?.comment || ''; }
+function myNote(cardId)            { return notes[cardId]?.[currentUser.id]?.note || ''; }
+
 // ═══════════════════════════════════════════════════════════
-//  SUPABASE REALTIME
+//  SUPABASE REALTIME  （订阅三张表）
 // ═══════════════════════════════════════════════════════════
 function subscribeRealtime() {
-  // Uses the Supabase Realtime JS client embedded below
   const client = createRealtimeClient(SB_URL, SB_KEY);
+  const ch = client.channel('riftbound_changes');
 
-  realtimeChannel = client
-    .channel('cards_v2_changes')
-    .on('postgres_changes',
-      { event: '*', schema: 'public', table: TABLE },
-      payload => handleRealtimeEvent(payload)
-    )
-    .subscribe(status => {
-      if (status === 'SUBSCRIBED') {
-        setSyncState('live', '实时同步');
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        setSyncState('err', '连接断开');
-        // Fallback: re-attempt after 5s
-        setTimeout(() => {
-          setSyncState('syncing', '重连中…');
-          realtimeChannel?.unsubscribe();
-          subscribeRealtime();
-        }, 5000);
-      } else if (status === 'CLOSED') {
-        setSyncState('err', '已断开');
-      }
-    });
-}
+  ch.on('postgres_changes', { event: '*', schema: 'public', table: 'cards' },
+    p => handleCardsEvent(p));
+  ch.on('postgres_changes', { event: '*', schema: 'public', table: 'card_grades' },
+    p => handleGradesEvent(p));
+  ch.on('postgres_changes', { event: '*', schema: 'public', table: 'card_notes' },
+    p => handleNotesEvent(p));
 
-function handleRealtimeEvent(payload) {
-  const { eventType, new: newRow, old: oldRow } = payload;
-
-  if (eventType === 'INSERT') {
-    const tab = newRow.tab;
-    if (!db[tab]) return;
-    // Avoid duplicate if we just inserted it ourselves
-    if (db[tab].find(c => c.id === newRow.id)) return;
-    db[tab].push({
-      id: newRow.id, name: newRow.name, img: newRow.img || '',
-      pos: newRow.pos || 0,
-      grade_a: newRow.grade_a || null, note_a: newRow.note_a || '',
-      grade_b: newRow.grade_b || null, note_b: newRow.note_b || '',
-    });
-    // Sort by pos
-    db[tab].sort((a, b) => a.pos - b.pos);
-    renderAll();
-    setSyncState('live', '实时同步');
-    return;
-  }
-
-  if (eventType === 'DELETE') {
-    const id = oldRow.id;
-    TABS.forEach(t => { db[t.id] = db[t.id].filter(c => c.id !== id); });
-    renderAll();
-    setSyncState('live', '实时同步');
-    return;
-  }
-
-  if (eventType === 'UPDATE') {
-    const r = newRow;
-    // Find card in db
-    let card = null;
-    for (const t of TABS) {
-      card = db[t.id].find(c => c.id === r.id);
-      if (card) break;
+  ch.subscribe(status => {
+    if (status === 'SUBSCRIBED') {
+      setSyncState('live', '实时同步');
+      realtimeChannel = ch;
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      setSyncState('err', '连接断开');
+      setTimeout(() => {
+        setSyncState('syncing', '重连中…');
+        ch.unsubscribe();
+        subscribeRealtime();
+      }, 5000);
+    } else if (status === 'CLOSED') {
+      setSyncState('err', '已断开');
     }
-    if (!card) return;
-
-    card.grade_a = r.grade_a || null;
-    card.note_a  = r.note_a  || '';
-    card.grade_b = r.grade_b || null;
-    card.note_b  = r.note_b  || '';
-    card.name    = r.name;
-    card.img     = r.img || '';
-
-    // Smart DOM patch — don't destroy focused textarea
-    patchCardDom();
-    renderTabs();
-    renderStats();
-    renderProgress();
-    setSyncState('live', '实时同步');
-    return;
-  }
+  });
 }
 
-// Patch grade ribbons, border colours, and peer badges in-place
-// Skips any card whose textarea currently has focus
-function patchCardDom() {
-  const gKey  = 'grade_' + activeUser;
-  const pgKey = 'grade_' + (activeUser === 'a' ? 'b' : 'a');
-  const peerLabel = activeUser === 'a' ? 'B' : 'A';
-  const focusedTextarea = document.activeElement?.classList.contains('note-box')
-    ? document.activeElement : null;
+function handleCardsEvent({ eventType, new: n, old: o }) {
+  if (eventType === 'INSERT') {
+    if (allCards.find(c => c.id === n.id)) return;
+    allCards.push({
+      id: n.id, name: n.name, img: n.img || '', pos: n.pos || 0,
+      set_code: n.set_code || '', card_number: n.card_number ?? null,
+      card_type: n.card_type || '', domains: Array.isArray(n.domains) ? n.domains : [],
+    });
+    allCards.sort((a, b) => a.pos - b.pos);
+    renderAll();
+  } else if (eventType === 'UPDATE') {
+    const card = allCards.find(c => c.id === n.id);
+    if (!card) return;
+    Object.assign(card, {
+      name: n.name, img: n.img || '', pos: n.pos || 0,
+      set_code: n.set_code || '', card_number: n.card_number ?? null,
+      card_type: n.card_type || '', domains: Array.isArray(n.domains) ? n.domains : [],
+    });
+    patchCardDom(); renderTabs();
+  } else if (eventType === 'DELETE') {
+    allCards = allCards.filter(c => c.id !== o.id);
+    renderAll();
+  }
+  setSyncState('live', '实时同步');
+}
 
-  const cards = filtered();
-  const cardEls = document.querySelectorAll('#cardGrid .ci');
+function handleGradesEvent({ eventType, new: n, old: o }) {
+  if (eventType === 'DELETE') {
+    if (grades[o.card_id]?.[o.user_id]) delete grades[o.card_id][o.user_id][o.format];
+  } else {
+    if (!grades[n.card_id]) grades[n.card_id] = {};
+    if (!grades[n.card_id][n.user_id]) grades[n.card_id][n.user_id] = {};
+    grades[n.card_id][n.user_id][n.format] = { grade: n.grade || null, comment: n.comment || '' };
+    if (!allUsers.find(u => u.id === n.user_id)) {
+      allUsers.push({ id: n.user_id, display_name: n.user_id.slice(0, 6) });
+    }
+  }
+  patchCardDom(); renderTabs(); renderStats(); renderProgress();
+  setSyncState('live', '实时同步');
+}
+
+function handleNotesEvent({ eventType, new: n, old: o }) {
+  if (eventType === 'DELETE') {
+    if (notes[o.card_id]?.[o.user_id]) delete notes[o.card_id][o.user_id];
+  } else {
+    if (!notes[n.card_id]) notes[n.card_id] = {};
+    notes[n.card_id][n.user_id] = { note: n.note || '' };
+  }
+  patchCardDom();
+  setSyncState('live', '实时同步');
+}
+
+// Smart DOM patch — 更新卡片状态，不销毁正在输入的 textarea
+function patchCardDom() {
+  const focusedEl = document.activeElement;
+  const isFocused = focusedEl?.tagName === 'TEXTAREA';
+  const cards     = filteredCards();
+  const cardEls   = document.querySelectorAll('#cardGrid .ci');
 
   cards.forEach((c, idx) => {
     const el = cardEls[idx];
     if (!el) return;
+    if (isFocused && el.contains(focusedEl)) return;
 
-    // Skip entirely if this card's textarea is focused
-    if (focusedTextarea && el.contains(focusedTextarea)) return;
+    const grade = myGrade(c.id);
+    const gc    = grade ? GC[grade] : null;
+    const gf    = grade ? GF[grade] : null;
 
-    const gc = c[gKey] ? GC[c[gKey]] : null;
-    const gf = c[gKey] ? GF[c[gKey]] : null;
-    const pg = c[pgKey];
-
-    // Border + data-g
-    if (gc) {
-      el.dataset.g = c[gKey];
-      el.style.setProperty('--gc', gc);
-    } else {
-      delete el.dataset.g;
-      el.style.removeProperty('--gc');
-    }
+    // Border
+    if (gc) { el.dataset.g = grade; el.style.setProperty('--gc', gc); }
+    else    { delete el.dataset.g; el.style.removeProperty('--gc'); }
 
     // Grade ribbon
     const thumb = el.querySelector('.ci-thumb');
     let ribbon = thumb.querySelector('.ci-ribbon');
-    if (c[gKey]) {
-      if (!ribbon) {
-        ribbon = document.createElement('div');
-        ribbon.className = 'ci-ribbon';
-        thumb.appendChild(ribbon);
-      }
-      ribbon.style.background = gc;
-      ribbon.style.color = gf;
-      ribbon.textContent = c[gKey];
-    } else {
-      ribbon?.remove();
-    }
+    if (grade) {
+      if (!ribbon) { ribbon = document.createElement('div'); ribbon.className = 'ci-ribbon'; thumb.appendChild(ribbon); }
+      ribbon.style.background = gc; ribbon.style.color = gf; ribbon.textContent = grade;
+    } else ribbon?.remove();
 
-    // Peer badge
-    let peer = thumb.querySelector('.ci-peer');
-    if (pg) {
-      if (!peer) {
-        peer = document.createElement('div');
-        peer.className = 'ci-peer';
-        thumb.appendChild(peer);
-      }
-      peer.innerHTML = `<div class="ci-peer-badge" style="background:${GC[pg]};color:${GF[pg]}">${pg}</div>
-        <span class="ci-peer-name">${peerLabel}</span>`;
-    } else {
-      peer?.remove();
-    }
+    // Peer badges
+    const peersEl = thumb.querySelector('.ci-peers');
+    const newBadges = buildPeerBadges(c.id);
+    if (peersEl) peersEl.outerHTML = newBadges;
+    else if (newBadges) thumb.insertAdjacentHTML('beforeend', newBadges);
 
     // Grade buttons
-    const gbs = el.querySelectorAll('.gb');
-    gbs.forEach((btn, i) => {
-      btn.classList.toggle('sel', G[i] === c[gKey]);
-    });
-  });
-}
+    el.querySelectorAll('.gb').forEach((btn, i) => btn.classList.toggle('sel', G[i] === grade));
 
-function hashRows(rows) {
-  return JSON.stringify(rows.map(r =>
-    `${r.id}:${r.grade_a}:${r.note_a}:${r.grade_b}:${r.note_b}:${r.name}`));
+    // Textareas（不覆盖当前焦点）
+    const commentEl = el.querySelector('.comment-box');
+    if (commentEl && commentEl !== focusedEl) commentEl.value = myComment(c.id);
+    const noteEl = el.querySelector('.note-box');
+    if (noteEl && noteEl !== focusedEl) noteEl.value = myNote(c.id);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
 //  CARD OPS
 // ═══════════════════════════════════════════════════════════
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
 async function addCard() {
   const name = document.getElementById('inName').value.trim();
   const img  = document.getElementById('inImg').value.trim();
   if (!name && !img) { toast('请至少填入卡名或图片 URL'); return; }
-  const list = db[activeTab];
-  const cardName = name || `卡牌 #${list.length + 1}`;
-  if (list.find(c => c.name === cardName)) { toast('该卡牌已存在'); return; }
-  const card = { id: uid(), name: cardName, img, pos: list.length,
-    grade_a: null, note_a: '', grade_b: null, note_b: '' };
-  list.push(card);
+  const cardName = name || `卡牌 #${allCards.length + 1}`;
+  if (allCards.find(c => c.name === cardName)) { toast('该卡牌已存在'); return; }
+  const card = {
+    id: uid(), name: cardName, img, pos: allCards.length,
+    set_code: '', card_number: null, card_type: '', domains: [],
+  };
+  allCards.push(card);
   document.getElementById('inName').value = '';
   document.getElementById('inImg').value  = '';
   document.getElementById('ocrStatus').textContent = '';
   renderAll();
-  await saveCard(card);
-  toast('已添加：' + cardName);
+  setSyncState('syncing', '同步中…');
+  try {
+    await sbUpsert('cards', {
+      id: card.id, name: card.name, img: card.img || null,
+      pos: card.pos, set_code: null, card_number: null, card_type: null, domains: null,
+    });
+    setSyncState('live', '已同步');
+    toast('已添加：' + cardName);
+  } catch(e) {
+    console.error('addCard error', e); setSyncState('err', '同步失败');
+  }
 }
 
 async function delCard(id) {
-  if (!confirm('确定删除此卡牌？此操作会从 Supabase 永久移除。')) return;
-  TABS.forEach(t => { db[t.id] = db[t.id].filter(c => c.id !== id); });
+  if (!confirm('确定删除此卡牌？此操作会从 Supabase 永久移除（含所有评级和备注）。')) return;
+  allCards = allCards.filter(c => c.id !== id);
+  delete grades[id]; delete notes[id];
   renderAll();
   setSyncState('syncing', '同步中…');
   try {
-    await sbFetch(`${TABLE}?id=eq.${encodeURIComponent(id)}`, 'DELETE');
+    // card_grades / card_notes 由外键 CASCADE DELETE 自动清除
+    await sbFetch(`cards?id=eq.${encodeURIComponent(id)}`, 'DELETE');
     setSyncState('live', '已同步');
   } catch(e) {
-    console.error('delete error', e);
-    setSyncState('err', '删除失败');
+    console.error('delCard error', e); setSyncState('err', '删除失败');
   }
 }
 
 async function setGrade(id, grade) {
-  const c = findCard(id);
-  if (!c) return;
-  const key = 'grade_' + activeUser;
-  c[key] = c[key] === grade ? null : grade;
+  const current = myGrade(id);
+  const next    = current === grade ? null : grade;
+  if (!grades[id]) grades[id] = {};
+  if (!grades[id][currentUser.id]) grades[id][currentUser.id] = {};
+  grades[id][currentUser.id][activeFormat] = {
+    grade:   next,
+    comment: grades[id][currentUser.id][activeFormat]?.comment || '',
+  };
   renderAll();
-  await saveCard(c);
+  await saveGrade(id);
+}
+
+function updateComment(id, val) {
+  if (!grades[id]) grades[id] = {};
+  if (!grades[id][currentUser.id]) grades[id][currentUser.id] = {};
+  if (!grades[id][currentUser.id][activeFormat]) grades[id][currentUser.id][activeFormat] = {};
+  grades[id][currentUser.id][activeFormat].comment = val;
+  clearTimeout(commentTimer);
+  commentTimer = setTimeout(() => saveGrade(id), 1500);
 }
 
 function updateNote(id, val) {
-  const c = findCard(id);
-  if (!c) return;
-  c['note_' + activeUser] = val;
+  if (!notes[id]) notes[id] = {};
+  notes[id][currentUser.id] = { note: val };
   clearTimeout(noteTimer);
-  noteTimer = setTimeout(() => saveCard(c), 1500);
+  noteTimer = setTimeout(() => saveNote(id), 1500);
 }
 
-async function saveCard(card) {
-  const tab  = findTabOf(card.id) || activeTab;
-  const row  = { id: card.id, tab, name: card.name, img: card.img || '', pos: card.pos || 0,
-    grade_a: card.grade_a || null, note_a: card.note_a || '',
-    grade_b: card.grade_b || null, note_b: card.note_b || '' };
+async function saveGrade(cardId) {
+  const entry = grades[cardId]?.[currentUser.id]?.[activeFormat];
   setSyncState('syncing', '同步中…');
   try {
-    await sbUpsert(row);
+    if (!entry || (!entry.grade && !entry.comment)) {
+      await sbFetch(
+        `card_grades?card_id=eq.${encodeURIComponent(cardId)}&user_id=eq.${encodeURIComponent(currentUser.id)}&format=eq.${activeFormat}`,
+        'DELETE'
+      );
+    } else {
+      await sbUpsert('card_grades', {
+        card_id: cardId, user_id: currentUser.id, format: activeFormat,
+        grade: entry.grade || null, comment: entry.comment || '',
+      });
+    }
     setSyncState('live', '已同步');
   } catch(e) {
-    console.error('save error', e);
-    setSyncState('err', '同步失败');
+    console.error('saveGrade error', e); setSyncState('err', '同步失败');
+  }
+}
+
+async function saveNote(cardId) {
+  const entry = notes[cardId]?.[currentUser.id];
+  setSyncState('syncing', '同步中…');
+  try {
+    if (!entry?.note) {
+      await sbFetch(
+        `card_notes?card_id=eq.${encodeURIComponent(cardId)}&user_id=eq.${encodeURIComponent(currentUser.id)}`,
+        'DELETE'
+      );
+    } else {
+      await sbUpsert('card_notes', { card_id: cardId, user_id: currentUser.id, note: entry.note });
+    }
+    setSyncState('live', '已同步');
+  } catch(e) {
+    console.error('saveNote error', e); setSyncState('err', '同步失败');
+  }
+}
+
+async function saveCardMeta(card) {
+  setSyncState('syncing', '同步中…');
+  try {
+    await sbUpsert('cards', {
+      id: card.id, name: card.name, img: card.img || null, pos: card.pos,
+      set_code: card.set_code || null, card_number: card.card_number ?? null,
+      card_type: card.card_type || null,
+      domains: card.domains?.length ? card.domains : null,
+    });
+    setSyncState('live', '已同步');
+  } catch(e) {
+    console.error('saveCardMeta error', e); setSyncState('err', '同步失败');
   }
 }
 
 async function editImg(id) {
-  const c = findCard(id);
+  const c = allCards.find(c => c.id === id);
   if (!c) return;
   const url = prompt(`为「${c.name}」设置图片 URL（留空清除）：`, c.img || '');
   if (url === null) return;
-  c.img = url.trim();
-  renderCards();
-  await saveCard(c);
+  c.img = url.trim(); renderCards(); await saveCardMeta(c);
 }
 
 async function editName(id, el) {
-  const c = findCard(id);
+  const c = allCards.find(c => c.id === id);
   if (!c) return;
   const inp = document.createElement('input');
   inp.value = c.name;
@@ -677,7 +759,7 @@ async function editName(id, el) {
   el.replaceWith(inp); inp.focus(); inp.select();
   const commit = async () => {
     const v = inp.value.trim();
-    if (v && v !== c.name) { c.name = v; await saveCard(c); }
+    if (v && v !== c.name) { c.name = v; await saveCardMeta(c); }
     renderAll();
   };
   inp.addEventListener('blur', commit);
@@ -688,27 +770,36 @@ async function editName(id, el) {
 }
 
 async function clearTab() {
-  const label = TABS.find(t => t.id === activeTab).label;
-  if (!confirm(`确定清空「${label}」页的所有卡牌？\n此操作将从 Supabase 永久删除所有该页卡牌。`)) return;
-  const ids = db[activeTab].map(c => c.id);
-  db[activeTab] = [];
-  renderAll();
+  const tab = TABS.find(t => t.id === activeTab);
+  if (!confirm(`确定清空「${tab.label}」页的所有卡牌？\n此操作将永久删除所有该页卡牌（含评级和备注）。`)) return;
+  const tabCards = getCardsForTab(activeTab, allCards);
+  const ids = tabCards.map(c => c.id);
   if (!ids.length) return;
+  allCards = allCards.filter(c => !ids.includes(c.id));
+  ids.forEach(id => { delete grades[id]; delete notes[id]; });
+  renderAll();
   setSyncState('syncing', '同步中…');
   try {
-    // Delete in batch via IN filter
-    const idList = ids.map(i => `"${i}"`).join(',');
-    await sbFetch(`${TABLE}?id=in.(${ids.map(i => encodeURIComponent(i)).join(',')})`, 'DELETE');
+    await sbFetch(`cards?id=in.(${ids.map(i => encodeURIComponent(i)).join(',')})`, 'DELETE');
     setSyncState('live', '已同步');
     toast(`已清空 ${ids.length} 张卡牌`);
   } catch(e) {
-    console.error('clearTab error', e);
-    setSyncState('err', '清空失败');
+    console.error('clearTab error', e); setSyncState('err', '清空失败');
   }
 }
 
-function findCard(id)   { for(const t of TABS){ const c=db[t.id].find(c=>c.id===id); if(c) return c; } }
-function findTabOf(id)  { for(const t of TABS){ if(db[t.id].find(c=>c.id===id)) return t.id; } }
+function findCard(id) { return allCards.find(c => c.id === id); }
+
+// ═══════════════════════════════════════════════════════════
+//  FORMAT SWITCH
+// ═══════════════════════════════════════════════════════════
+function switchFormat(fmt) {
+  activeFormat = fmt;
+  document.getElementById('fBtnC').classList.toggle('active', fmt === 'constructed');
+  document.getElementById('fBtnL').classList.toggle('active', fmt === 'limited');
+  activeFilter = 'ALL';
+  renderAll();
+}
 
 // ═══════════════════════════════════════════════════════════
 //  IMPORT
@@ -726,90 +817,56 @@ function switchImportMode(mode) {
   document.getElementById('iPanelText').classList.toggle('active', mode === 'text');
 }
 
-function previewJson() {
-  const res = document.getElementById('jsonResult');
-  res.style.display = 'none';
-}
+function previewJson() { document.getElementById('jsonResult').style.display = 'none'; }
 
 async function doJsonImport() {
-  const file   = document.getElementById('jsonFile').files[0];
-  const target = document.getElementById('jsonTarget').value;
-  const res    = document.getElementById('jsonResult');
+  const file = document.getElementById('jsonFile').files[0];
+  const res  = document.getElementById('jsonResult');
   if (!file) { toast('请先选择 JSON 文件'); return; }
-
   let parsed;
-  try {
-    const text = await file.text();
-    parsed = JSON.parse(text);
-  } catch {
-    res.textContent = '❌ JSON 格式错误，请检查文件内容';
-    res.className = 'import-result err'; res.style.display = 'block';
-    return;
+  try { parsed = JSON.parse(await file.text()); }
+  catch {
+    res.textContent = '❌ JSON 格式错误';
+    res.className = 'import-result err'; res.style.display = 'block'; return;
   }
 
-  // Accept two formats:
-  // 1. Official scrape: { tabId: [{name, img}] }
-  // 2. App export (old): { tabId: [{id, name, img, grade, note}] }
+  // 支持：[{name,img,card_type,domains,...}] 或 { anyKey: [{...}] }
   let total = 0, skipped = 0, added = 0;
   const newCards = [];
 
-  const importIntoTab = (tabId, items) => {
-    const list = db[tabId];
-    if (!list) return;
+  const importItems = (items) => {
     for (const item of items) {
-      const cardName = item.name || `卡牌 #${list.length + total + 1}`;
+      const cardName = item.name?.trim();
+      if (!cardName) continue;
       total++;
-      if (list.find(c => c.name === cardName)) { skipped++; continue; }
+      if (allCards.find(c => c.name === cardName)) { skipped++; continue; }
       const card = {
-        id: uid(), name: cardName, img: item.img || '', pos: list.length,
-        grade_a: null, note_a: '', grade_b: null, note_b: ''
+        id: uid(), name: cardName, img: item.img || '', pos: allCards.length + added,
+        set_code:    item.set_code    || '',
+        card_number: item.card_number ?? null,
+        card_type:   item.card_type   || '',
+        domains:     Array.isArray(item.domains) ? item.domains : [],
       };
-      list.push(card);
-      newCards.push({ card, tabId });
-      added++;
+      allCards.push(card); newCards.push(card); added++;
     }
   };
 
-  if (target === 'all') {
-    // Multi-tab JSON: { special: [...], red: [...], ... }
-    for (const [key, items] of Object.entries(parsed)) {
-      if (!Array.isArray(items)) continue;
-      const tabId = key.toLowerCase();
-      importIntoTab(tabId, items);
-    }
-  } else {
-    // Force all into selected tab
-    let items = [];
-    if (Array.isArray(parsed)) {
-      items = parsed;
-    } else {
-      // Flatten all arrays from the JSON
-      for (const v of Object.values(parsed)) {
-        if (Array.isArray(v)) items.push(...v);
-      }
-    }
-    importIntoTab(target, items);
-  }
+  if (Array.isArray(parsed)) { importItems(parsed); }
+  else { for (const items of Object.values(parsed)) { if (Array.isArray(items)) importItems(items); } }
 
   renderAll();
 
-  // Batch upsert to Supabase
   if (newCards.length) {
     setSyncState('syncing', '同步中…');
     try {
-      const rows = newCards.map(({ card, tabId }) => ({
-        id: card.id, tab: tabId, name: card.name, img: card.img || '',
-        pos: card.pos, grade_a: null, note_a: '', grade_b: null, note_b: ''
+      const rows = newCards.map(c => ({
+        id: c.id, name: c.name, img: c.img || null, pos: c.pos,
+        set_code: c.set_code || null, card_number: c.card_number ?? null,
+        card_type: c.card_type || null, domains: c.domains?.length ? c.domains : null,
       }));
-      // Upsert in chunks of 200
-      for (let i = 0; i < rows.length; i += 200) {
-        await sbUpsert(rows.slice(i, i + 200));
-      }
+      for (let i = 0; i < rows.length; i += 200) await sbUpsert('cards', rows.slice(i, i + 200));
       setSyncState('live', '已同步');
-    } catch(e) {
-      console.error('import upsert error', e);
-      setSyncState('err', '同步失败');
-    }
+    } catch(e) { console.error('import error', e); setSyncState('err', '同步失败'); }
   }
 
   res.textContent = `✓ 成功导入 ${added} 张，跳过重复 ${skipped} 张（共 ${total} 张）`;
@@ -819,34 +876,31 @@ async function doJsonImport() {
 
 async function doBulkImport() {
   const lines = document.getElementById('bulkTxt').value.split('\n').filter(l => l.trim());
-  const list  = db[activeTab];
   const newCards = [];
   let added = 0;
   for (const line of lines) {
     const t = line.trim();
     let name, img;
-    if (t.includes('|'))                                      { [name, img] = t.split('|').map(s => s.trim()); }
+    if (t.includes('|'))                                           { [name, img] = t.split('|').map(s => s.trim()); }
     else if (t.startsWith('http://') || t.startsWith('https://')) { img = t; name = ''; }
-    else                                                          { name = t; img = ''; }
-    const cardName = name || `卡牌 #${list.length + added + 1}`;
-    if (list.find(c => c.name === cardName)) continue;
-    const card = { id: uid(), name: cardName, img: img || '', pos: list.length + added,
-      grade_a: null, note_a: '', grade_b: null, note_b: '' };
-    list.push(card);
-    newCards.push(card);
-    added++;
+    else                                                           { name = t; img = ''; }
+    const cardName = name || `卡牌 #${allCards.length + added + 1}`;
+    if (allCards.find(c => c.name === cardName)) continue;
+    const card = {
+      id: uid(), name: cardName, img: img || '', pos: allCards.length + added,
+      set_code: '', card_number: null, card_type: '', domains: [],
+    };
+    allCards.push(card); newCards.push(card); added++;
   }
   document.getElementById('bulkTxt').value = '';
-  closeImport();
-  renderAll();
+  closeImport(); renderAll();
   if (newCards.length) {
     setSyncState('syncing', '同步中…');
     try {
-      const rows = newCards.map(c => ({
-        id: c.id, tab: activeTab, name: c.name, img: c.img || '', pos: c.pos,
-        grade_a: null, note_a: '', grade_b: null, note_b: ''
-      }));
-      await sbUpsert(rows);
+      await sbUpsert('cards', newCards.map(c => ({
+        id: c.id, name: c.name, img: c.img || null, pos: c.pos,
+        set_code: null, card_number: null, card_type: null, domains: null,
+      })));
       setSyncState('live', '已同步');
     } catch(e) { setSyncState('err', '同步失败'); }
   }
@@ -854,54 +908,80 @@ async function doBulkImport() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  USER SWITCH
-// ═══════════════════════════════════════════════════════════
-function switchUser(u) {
-  activeUser = u.toLowerCase();
-  document.getElementById('uBtnA').classList.toggle('active', activeUser === 'a');
-  document.getElementById('uBtnB').classList.toggle('active', activeUser === 'b');
-  renderAll();
-}
-
-// ═══════════════════════════════════════════════════════════
 //  COMPARE
 // ═══════════════════════════════════════════════════════════
-function openCompare() { document.getElementById('cmpOv').classList.add('open'); }
-function closeCmp()    { document.getElementById('cmpOv').classList.remove('open'); }
+function openCompare() {
+  document.getElementById('cmpFormat').value = activeFormat;
+  document.getElementById('cmpOv').classList.add('open');
+}
+function closeCmp() { document.getElementById('cmpOv').classList.remove('open'); }
 
 function startCompare() {
+  const fmt = document.getElementById('cmpFormat').value;
   closeCmp();
   document.getElementById('cardArea').style.display = 'none';
   const area = document.getElementById('cmpArea');
   area.style.display = 'flex';
 
+  // 有该赛制评级的用户
+  const participants = allUsers.filter(u =>
+    allCards.some(c => grades[c.id]?.[u.id]?.[fmt]?.grade)
+  );
+  if (!participants.length) {
+    area.innerHTML = `<div style="padding:40px;color:var(--text-dim);text-align:center">
+      暂无「${fmt === 'constructed' ? '构筑' : '限制'}赛」评级数据<br><br>
+      <button class="btn btn-ghost btn-sm" onclick="exitCmp()">返回</button>
+    </div>`;
+    return;
+  }
+
+  const colW      = Math.max(60, Math.floor(380 / participants.length));
+  const gridCols  = `165px ${participants.map(() => colW + 'px').join(' ')}`;
+
   let html = `<div style="display:flex;justify-content:space-between;align-items:center">
-    <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold-light);letter-spacing:.1em">评级对比</div>
+    <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold-light);letter-spacing:.1em">
+      评级对比 · ${fmt === 'constructed' ? '构筑赛' : '限制赛'}
+    </div>
     <button class="btn btn-ghost btn-sm" onclick="exitCmp()">退出对比</button>
   </div>`;
 
-  for (const t of TABS) {
-    const cards = db[t.id];
-    if (!cards.length) continue;
-    html += `<div><div class="cmp-tab-label" style="color:${t.color}">${t.label}</div>
-      <div class="cmp-head">
+  for (const tab of TABS) {
+    const tabCards = getCardsForTab(tab.id, allCards);
+    const rated    = tabCards.filter(c => participants.some(u => grades[c.id]?.[u.id]?.[fmt]?.grade));
+    if (!rated.length) continue;
+
+    html += `<div>
+      <div class="cmp-tab-label" style="color:${tab.color}">${tab.label}</div>
+      <div class="cmp-head" style="grid-template-columns:${gridCols}">
         <div>卡牌</div>
-        <div class="cmp-hl" style="color:var(--gold)">玩家 A</div>
-        <div class="cmp-hl" style="color:#8ab4e8">玩家 B</div>
+        ${participants.map(u => `<div class="cmp-hl">${u.display_name}</div>`).join('')}
       </div>`;
-    for (const c of cards) {
-      const ga = c.grade_a, gb = c.grade_b, diff = ga !== gb;
-      const badge = (g, col) => g
-        ? `<div class="cmp-badge" style="background:${GC[g]};color:${GF[g]}">${g}</div>`
-        : `<div class="cmp-badge" style="background:var(--bg-input);color:var(--text-dim);font-size:12px">—</div>`;
-      html += `<div class="cmp-row ${diff ? 'diff' : ''}">
-        <div class="cmp-name">${diff ? '<span class="diff-ico">⚡</span>' : '<span style="width:14px"></span>'}${c.name}</div>
-        <div class="cmp-cell">${badge(ga)}${c.note_a ? `<div class="cmp-note">${c.note_a}</div>` : ''}</div>
-        <div class="cmp-cell">${badge(gb)}${c.note_b ? `<div class="cmp-note">${c.note_b}</div>` : ''}</div>
+
+    for (const c of rated) {
+      const userGrades = participants.map(u => grades[c.id]?.[u.id]?.[fmt]?.grade || null);
+      const uniq = new Set(userGrades.filter(Boolean));
+      const diff = uniq.size > 1;
+      html += `<div class="cmp-row ${diff ? 'diff' : ''}" style="grid-template-columns:${gridCols}">
+        <div class="cmp-name">
+          ${diff ? '<span class="diff-ico">⚡</span>' : '<span style="width:14px;display:inline-block"></span>'}
+          ${c.name}
+        </div>
+        ${participants.map(u => {
+          const g       = grades[c.id]?.[u.id]?.[fmt]?.grade;
+          const comment = grades[c.id]?.[u.id]?.[fmt]?.comment || '';
+          return `<div class="cmp-cell">
+            ${g
+              ? `<div class="cmp-badge" style="background:${GC[g]};color:${GF[g]}">${g}</div>`
+              : `<div class="cmp-badge" style="background:var(--bg-input);color:var(--text-dim);font-size:12px">—</div>`
+            }
+            ${comment ? `<div class="cmp-note">${comment}</div>` : ''}
+          </div>`;
+        }).join('')}
       </div>`;
     }
     html += `</div>`;
   }
+
   area.innerHTML = html;
 }
 
@@ -913,14 +993,29 @@ function exitCmp() {
 // ═══════════════════════════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════════════════════════
-function renderAll() { renderTabs(); renderFilter(); renderCards(); renderStats(); renderProgress(); }
+function renderAll() {
+  renderLegend(); renderTabs(); renderFilter();
+  renderCards(); renderStats(); renderProgress();
+}
 
+// ── 评级说明（按赛制动态切换）────────────────────────────────
+function renderLegend() {
+  const panel = document.getElementById('legendPanel');
+  if (!panel) return;
+  const desc = GL[activeFormat];
+  panel.innerHTML = G.map(g => `
+    <div class="leg-row">
+      <div class="leg-badge" style="background:${GC[g]};color:${GF[g]}">${g}</div>
+      <div class="leg-text"><b>${g} 档</b>${desc[g]}</div>
+    </div>`).join('');
+}
+
+// ── Tabs ─────────────────────────────────────────────────────
 function renderTabs() {
   document.getElementById('tabBar').innerHTML = TABS.map(t => {
-    const list    = db[t.id];
-    const graded  = list.filter(c => c['grade_' + activeUser]).length;
-    const total   = list.length;
-    const pctStr  = total ? `${graded}/${total}` : '';
+    const tabCards = getCardsForTab(t.id, allCards);
+    const total    = tabCards.length;
+    const graded   = tabCards.filter(c => myGrade(c.id)).length;
     return `<div class="tab ${activeTab === t.id ? 'active' : ''}" style="--ta:${t.color}"
       onclick="switchTab('${t.id}')">
       <div class="tab-pip"></div>${t.label}
@@ -932,16 +1027,17 @@ function renderTabs() {
 
 function switchTab(id) {
   activeTab = id; activeFilter = 'ALL'; searchQuery = '';
-  document.getElementById('searchBox') && (document.getElementById('searchBox').value = '');
+  const sb = document.getElementById('searchBox');
+  if (sb) sb.value = '';
   renderAll();
 }
 
+// ── Filter bar ───────────────────────────────────────────────
 function renderFilter() {
-  const gKey = 'grade_' + activeUser;
   const items = [
-    { k:'ALL', label:'全部' },
+    { k:'ALL',  label:'全部' },
     ...G.map(g => ({ k:g, label:g, grade:true })),
-    { k:'NONE', label:'未评' }
+    { k:'NONE', label:'未评' },
   ];
   const filters = items.map(i => {
     const isG = !!i.grade, isActive = activeFilter === i.k;
@@ -952,10 +1048,9 @@ function renderFilter() {
       style="${style}" onclick="setFilter('${i.k}')">${i.label}</div>`;
   }).join('');
 
-  const cnt = filtered().length;
-  const total = db[activeTab].length;
-  const countLabel = cnt < total
-    ? `<span class="card-count">${cnt} / ${total}</span>` : '';
+  const cnt   = filteredCards().length;
+  const total = getCardsForTab(activeTab, allCards).length;
+  const countLabel = cnt < total ? `<span class="card-count">${cnt} / ${total}</span>` : '';
 
   document.getElementById('filterRow').innerHTML =
     filters + countLabel +
@@ -969,19 +1064,17 @@ function renderFilter() {
 function setFilter(f) { activeFilter = f; renderFilter(); renderCards(); }
 
 function onSearch(v) {
-  searchQuery = v.trim();
-  renderCards();
-  // update count label without re-rendering the whole filter row
-  const cnt = filtered().length, total = db[activeTab].length;
-  const cl = document.querySelector('.card-count');
+  searchQuery = v.trim(); renderCards();
+  const cnt   = filteredCards().length;
+  const total = getCardsForTab(activeTab, allCards).length;
+  const cl    = document.querySelector('.card-count');
   if (cl) cl.textContent = cnt < total ? `${cnt} / ${total}` : '';
 }
 
-function filtered() {
-  const gKey = 'grade_' + activeUser;
-  let list = db[activeTab];
-  if (activeFilter === 'NONE') list = list.filter(c => !c[gKey]);
-  else if (activeFilter !== 'ALL') list = list.filter(c => c[gKey] === activeFilter);
+function filteredCards() {
+  let list = getCardsForTab(activeTab, allCards);
+  if (activeFilter === 'NONE')      list = list.filter(c => !myGrade(c.id));
+  else if (activeFilter !== 'ALL')  list = list.filter(c => myGrade(c.id) === activeFilter);
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     list = list.filter(c => c.name.toLowerCase().includes(q));
@@ -989,17 +1082,15 @@ function filtered() {
   return list;
 }
 
+// ── Card grid ────────────────────────────────────────────────
 function renderCards() {
-  const grid  = document.getElementById('cardGrid');
+  const grid = document.getElementById('cardGrid');
   if (isLoading) { showSkeleton(); return; }
-  const cards = filtered();
-  const gKey  = 'grade_' + activeUser;
-  const nKey  = 'note_'  + activeUser;
-  const pgKey = 'grade_' + (activeUser === 'a' ? 'b' : 'a'); // peer
-  const peerLabel = activeUser === 'a' ? 'B' : 'A';
+  const cards = filteredCards();
 
   if (!cards.length) {
-    const msg = db[activeTab].length === 0
+    const tabTotal = getCardsForTab(activeTab, allCards).length;
+    const msg = tabTotal === 0
       ? '此页还没有卡牌<br>在左侧手动添加，或使用「导入卡牌」'
       : '此筛选下无卡牌';
     grid.innerHTML = `<div class="empty"><div class="empty-ico">🃏</div><div class="empty-txt">${msg}</div></div>`;
@@ -1007,11 +1098,22 @@ function renderCards() {
   }
 
   grid.innerHTML = cards.map(c => {
-    const gc = c[gKey] ? GC[c[gKey]] : null;
-    const gf = c[gKey] ? GF[c[gKey]] : null;
-    const pg = c[pgKey];
+    const grade   = myGrade(c.id);
+    const comment = myComment(c.id);
+    const note    = myNote(c.id);
+    const gc      = grade ? GC[grade] : null;
+    const gf      = grade ? GF[grade] : null;
 
-    return `<div class="ci" ${gc ? `data-g="${c[gKey]}" style="--gc:${gc}"` : ''}
+    // 卡牌编号 + 特性标签
+    const numTag = (c.set_code && c.card_number != null)
+      ? `<span class="ci-tag card-num">${c.set_code}-${c.card_number}</span>` : '';
+    const domainTags = (c.domains || []).map(d =>
+      `<span class="ci-tag domain" style="--dt:${DOMAIN_COLOR[d] || 'var(--text-dim)'}">${d}</span>`
+    ).join('');
+    const metaHtml = (numTag || domainTags)
+      ? `<div class="ci-meta">${numTag}${domainTags}</div>` : '';
+
+    return `<div class="ci" ${gc ? `data-g="${grade}" style="--gc:${gc}"` : ''}
       ondblclick="editImg('${c.id}')" title="单击放大卡图 · 双击修改图片 URL">
       <button class="ci-del" onclick="delCard('${c.id}')">×</button>
       <div class="ci-thumb">
@@ -1019,53 +1121,68 @@ function renderCards() {
           ? `<img src="${c.img}" alt="${c.name}" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in"
                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
              <div class="ci-ph" style="display:none" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in">
-               <div class="ci-ph-ico">🃏</div>
-               <div class="ci-ph-name">${c.name}</div>
+               <div class="ci-ph-ico">🃏</div><div class="ci-ph-name">${c.name}</div>
              </div>`
           : `<div class="ci-ph" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in">
-               <div class="ci-ph-ico">🃏</div>
-               <div class="ci-ph-name">${c.name}</div>
+               <div class="ci-ph-ico">🃏</div><div class="ci-ph-name">${c.name}</div>
              </div>`
         }
-        ${c[gKey] ? `<div class="ci-ribbon" style="background:${gc};color:${gf}">${c[gKey]}</div>` : ''}
-        ${pg ? `<div class="ci-peer">
-          <div class="ci-peer-badge" style="background:${GC[pg]};color:${GF[pg]}">${pg}</div>
-          <span class="ci-peer-name">${peerLabel}</span>
-        </div>` : ''}
+        ${grade ? `<div class="ci-ribbon" style="background:${gc};color:${gf}">${grade}</div>` : ''}
+        ${buildPeerBadges(c.id)}
       </div>
       <div class="ci-body">
         <div class="ci-name" title="点击编辑名称" onclick="editName('${c.id}',this)">${c.name}</div>
+        ${metaHtml}
         <div class="gb-row">
-          ${G.map(g => `<button class="gb ${g.toLowerCase()} ${c[gKey] === g ? 'sel' : ''}"
+          ${G.map(g => `<button class="gb ${g.toLowerCase()} ${grade === g ? 'sel' : ''}"
             onclick="setGrade('${c.id}','${g}')">${g}</button>`).join('')}
         </div>
-        <textarea class="note-box" rows="2" placeholder="备注…"
-          oninput="updateNote('${c.id}',this.value)">${c[nKey] || ''}</textarea>
+        <div class="box-label">强度评语</div>
+        <textarea class="comment-box" rows="2"
+          placeholder="${activeFormat === 'constructed' ? '构筑思路…' : '限制心得…'}"
+          oninput="updateComment('${c.id}',this.value)">${comment}</textarea>
+        <div class="box-label" style="margin-top:4px">使用心得</div>
+        <textarea class="note-box" rows="2" placeholder="心得备注…"
+          oninput="updateNote('${c.id}',this.value)">${note}</textarea>
       </div>
     </div>`;
   }).join('');
 }
 
+// 构建他人评级角标
+function buildPeerBadges(cardId) {
+  const others = allUsers.filter(u => u.id !== currentUser?.id);
+  const badges = others.map(u => {
+    const g = grades[cardId]?.[u.id]?.[activeFormat]?.grade;
+    if (!g) return '';
+    return `<div class="ci-peer-badge" style="background:${GC[g]};color:${GF[g]}">
+      <span class="ci-peer-grade">${g}</span>
+      <span class="ci-peer-name">${u.display_name}</span>
+    </div>`;
+  }).filter(Boolean).join('');
+  return badges ? `<div class="ci-peers">${badges}</div>` : '';
+}
+
+// ── Stats ─────────────────────────────────────────────────────
 function renderStats() {
-  const sec  = document.getElementById('sbStats');
-  const list = db[activeTab];
-  const gKey = 'grade_' + activeUser;
-  if (!list.length) { sec.innerHTML = ''; return; }
-  const total = list.length;
+  const sec = document.getElementById('sbStats');
+  const tabCards = getCardsForTab(activeTab, allCards);
+  if (!tabCards.length) { sec.innerHTML = ''; return; }
+  const total = tabCards.length;
   let html = `<div class="sb-title">当前页统计</div>`;
   for (const g of G) {
-    const n = list.filter(c => c[gKey] === g).length;
+    const n   = tabCards.filter(c => myGrade(c.id) === g).length;
     const pct = Math.round(n / total * 100);
     html += `<div class="st-row">
       <div class="st-left">
         <div class="st-badge" style="background:${GC[g]};color:${GF[g]}">${g}</div>
-        <span class="st-desc">${GL[g]}</span>
+        <span class="st-desc">${GL[activeFormat][g].slice(0, 9)}…</span>
       </div>
       <div class="st-num">${n}</div>
     </div>
     <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${GC[g]}"></div></div>`;
   }
-  const ur = list.filter(c => !c[gKey]).length;
+  const ur = tabCards.filter(c => !myGrade(c.id)).length;
   html += `<div class="st-row" style="margin-top:3px">
     <span class="st-desc">未评级</span>
     <div class="st-num" style="font-size:13px">${ur}</div>
@@ -1073,25 +1190,19 @@ function renderStats() {
   sec.innerHTML = html;
 }
 
+// ── Progress bar ──────────────────────────────────────────────
 function renderProgress() {
-  const gKey  = 'grade_' + activeUser;
-  let graded = 0, total = 0;
-  TABS.forEach(t => {
-    const list = db[t.id];
-    total  += list.length;
-    graded += list.filter(c => c[gKey]).length;
-  });
+  let graded = 0, total = allCards.length;
+  for (const c of allCards) { if (myGrade(c.id)) graded++; }
   const pct = total ? Math.round(graded / total * 100) : 0;
   document.getElementById('progFill').style.width = pct + '%';
-  document.getElementById('progPct').textContent  = pct + '%';
-  document.getElementById('progLabel').textContent =
-    `全局进度 (${graded}/${total})`;
+  document.getElementById('progPct').textContent   = pct + '%';
+  document.getElementById('progLabel').textContent = `全局进度 (${graded}/${total})`;
 }
 
+// ── Skeleton ──────────────────────────────────────────────────
 function showSkeleton() {
-  const grid = document.getElementById('cardGrid');
-  const n = 12;
-  grid.innerHTML = Array(n).fill(0).map(() =>
+  document.getElementById('cardGrid').innerHTML = Array(12).fill(0).map(() =>
     `<div class="skel"><div class="skel-thumb"></div>
       <div class="skel-body">
         <div class="skel-line" style="width:70%"></div>
@@ -1130,22 +1241,19 @@ async function runOCR() {
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'url', url } },
           { type: 'text',  text: '这是一张 Riftbound TCG 卡牌。请只回答卡牌名称（中文名），不要任何其他文字。无法识别则回答"未知"。' }
-        ]}]
-      })
+        ]}],
+      }),
     });
     const data = await resp.json();
     const name = data?.content?.[0]?.text?.trim() || '';
     if (name && name !== '未知') {
       document.getElementById('inName').value = name;
-      status.textContent = `✓ ${name}`;
-      status.style.color = '#7ecba1';
+      status.textContent = `✓ ${name}`; status.style.color = '#7ecba1';
     } else {
-      status.textContent = '无法识别，请手动输入';
-      status.style.color = 'var(--text-dim)';
+      status.textContent = '无法识别，请手动输入'; status.style.color = 'var(--text-dim)';
     }
-  } catch(e) {
-    status.textContent = 'AI 识别失败';
-    status.style.color = '#d07070';
+  } catch {
+    status.textContent = 'AI 识别失败'; status.style.color = '#d07070';
   }
   btn.classList.remove('loading'); btn.textContent = '识别';
 }
@@ -1154,7 +1262,7 @@ async function runOCR() {
 //  SYNC STATE UI
 // ═══════════════════════════════════════════════════════════
 function setSyncState(state, label) {
-  document.getElementById('syncDot').className  = 'sync-dot ' + state;
+  document.getElementById('syncDot').className     = 'sync-dot ' + state;
   document.getElementById('syncLabel').textContent = label;
 }
 
@@ -1172,109 +1280,83 @@ function toast(msg) {
 // ═══════════════════════════════════════════════════════════
 //  KEY BINDINGS
 // ═══════════════════════════════════════════════════════════
-document.getElementById('inName').addEventListener('keydown', e => { if(e.key==='Enter') addCard(); });
-document.getElementById('inImg').addEventListener('keydown',  e => { if(e.key==='Enter') addCard(); });
-document.getElementById('importOv').addEventListener('click', e => { if(e.target===e.currentTarget) closeImport(); });
-document.getElementById('cmpOv').addEventListener('click',   e => { if(e.target===e.currentTarget) closeCmp(); });
+document.getElementById('inName').addEventListener('keydown', e => { if (e.key === 'Enter') addCard(); });
+document.getElementById('inImg').addEventListener('keydown',  e => { if (e.key === 'Enter') addCard(); });
+document.getElementById('importOv').addEventListener('click', e => { if (e.target === e.currentTarget) closeImport(); });
+document.getElementById('cmpOv').addEventListener('click',   e => { if (e.target === e.currentTarget) closeCmp(); });
 
-// ── Keyboard shortcuts ────────────────────────────────────────────────────
-// S/A/B/C/D → grade focused card | Escape → clear grade | ← → → navigate cards
-let focusedCardId = null;
-
+// S/A/B/C/D/E → 评级聚焦卡 | Escape → 取消 | ← → → 导航
 document.addEventListener('keydown', e => {
-  // Don't fire when typing in an input / textarea
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  // Don't fire when a modal is open
   if (document.querySelector('.overlay.open')) return;
-
   const key = e.key.toUpperCase();
-
   if (G.includes(key) && focusedCardId) {
-    e.preventDefault();
-    setGrade(focusedCardId, key);
-    return;
+    e.preventDefault(); setGrade(focusedCardId, key); return;
   }
-
   if (e.key === 'Escape' && focusedCardId) {
-    // Clear grade
-    const c = findCard(focusedCardId);
-    if (c) { c['grade_' + activeUser] = null; renderAll(); saveCard(c); }
+    // 取消当前聚焦卡评级
+    const current = myGrade(focusedCardId);
+    if (current) setGrade(focusedCardId, current);  // toggle off
     return;
   }
-
   if (e.key === 'Escape') { closeLightbox(); return; }
-
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-    e.preventDefault();
-    navigateCard(e.key === 'ArrowRight' ? 1 : -1);
+    e.preventDefault(); navigateCard(e.key === 'ArrowRight' ? 1 : -1);
   }
 });
 
 function setFocusedCard(id) {
-  // Remove previous highlight
   document.querySelectorAll('.ci.kb-focus').forEach(el => el.classList.remove('kb-focus'));
   focusedCardId = id;
   if (!id) return;
-  const cards = filtered();
+  const cards = filteredCards();
   const idx   = cards.findIndex(c => c.id === id);
   const el    = document.querySelectorAll('#cardGrid .ci')[idx];
-  if (el) {
-    el.classList.add('kb-focus');
-    el.scrollIntoView({ block: 'nearest' });
-  }
+  if (el) { el.classList.add('kb-focus'); el.scrollIntoView({ block: 'nearest' }); }
 }
 
 function navigateCard(dir) {
-  const cards = filtered();
+  const cards = filteredCards();
   if (!cards.length) return;
-  const idx = focusedCardId ? cards.findIndex(c => c.id === focusedCardId) : -1;
+  const idx  = focusedCardId ? cards.findIndex(c => c.id === focusedCardId) : -1;
   const next = Math.max(0, Math.min(cards.length - 1, idx + dir));
   setFocusedCard(cards[next].id);
 }
 
-// Click on card body sets keyboard focus
 document.getElementById('cardGrid').addEventListener('click', e => {
   const ci = e.target.closest('.ci');
-  if (ci) {
-    // Find card id from delete button or grade buttons
-    const delBtn = ci.querySelector('.ci-del');
-    if (delBtn) {
-      // Extract id from onclick attr
-      const m = delBtn.getAttribute('onclick').match(/'([^']+)'/);
-      if (m) setFocusedCard(m[1]);
-    }
+  if (!ci) return;
+  const delBtn = ci.querySelector('.ci-del');
+  if (delBtn) {
+    const m = delBtn.getAttribute('onclick').match(/'([^']+)'/);
+    if (m) setFocusedCard(m[1]);
   }
 });
 
-// ═══════════════════════════════════════════════════════════
-//  FORMAT SWITCH（第二步实现，目前为存根）
-// ═══════════════════════════════════════════════════════════
-let activeFormat = 'constructed';   // 'constructed' | 'limited'
-
-function switchFormat(fmt) {
-  activeFormat = fmt;
-  document.getElementById('fBtnC').classList.toggle('active', fmt === 'constructed');
-  document.getElementById('fBtnL').classList.toggle('active', fmt === 'limited');
-  // TODO 第二步：重新渲染评分和评语
-}
-
-// ── Lightbox ─────────────────────────────────────────────────────────────
+// ── Lightbox ──────────────────────────────────────────────────
 function openLightbox(evt, id) {
-  evt.stopPropagation(); // prevent ondblclick from firing
+  evt.stopPropagation();
   const c = findCard(id);
   if (!c) return;
   const content = document.getElementById('lbContent');
   if (c.img) {
     content.innerHTML = `<img class="lb-img" src="${c.img}" alt="${c.name}"
       onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="lb-ph" style="display:none">
-        <div class="lb-ph-ico">🃏</div>
-      </div>`;
+      <div class="lb-ph" style="display:none"><div class="lb-ph-ico">🃏</div></div>`;
   } else {
     content.innerHTML = `<div class="lb-ph"><div class="lb-ph-ico">🃏</div></div>`;
   }
   document.getElementById('lbName').textContent = c.name;
+  // 卡牌 meta 标签
+  const setName = c.set_code ? (sets[c.set_code] ? `${sets[c.set_code]}（${c.set_code}）` : c.set_code) : '';
+  const numTag  = (c.set_code && c.card_number != null)
+    ? `<span class="ci-tag card-num">${c.set_code}-${c.card_number}</span>` : '';
+  const setTag  = setName ? `<span class="ci-tag">${setName}</span>` : '';
+  const domTags = (c.domains || []).map(d =>
+    `<span class="ci-tag domain" style="--dt:${DOMAIN_COLOR[d] || 'var(--text-dim)'}">${d}</span>`
+  ).join('');
+  document.getElementById('lbMeta').innerHTML = numTag + setTag + domTags;
   document.getElementById('lightbox').classList.add('open');
 }
 
