@@ -617,31 +617,53 @@ function patchCardDom() {
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
 async function addCard() {
-  const name = document.getElementById('inName').value.trim();
-  const img  = document.getElementById('inImg').value.trim();
-  if (!name && !img) { toast('请至少填入卡名或图片 URL'); return; }
-  const cardName = name || `卡牌 #${allCards.length + 1}`;
-  if (allCards.find(c => c.name === cardName)) { toast('该卡牌已存在'); return; }
+  const name      = document.getElementById('inName').value.trim();
+  const img       = document.getElementById('inImg').value.trim();
+  const card_type = document.getElementById('inCardType').value;  // 'legend'|'battlefield'|'spell'
+  // domains：从多选 checkbox 收集（只在 card_type 为普通牌时有效）
+  const domains   = card_type === 'legend' || card_type === 'battlefield'
+    ? []
+    : Array.from(document.querySelectorAll('#inDomains input:checked')).map(el => el.value);
+
+  if (!name) { toast('请填入卡牌名称'); return; }
+  if (card_type !== 'legend' && card_type !== 'battlefield' && domains.length === 0) {
+    toast('请至少选择一个特性，或选择传奇 / 战场类型'); return;
+  }
+  if (allCards.find(c => c.name === name)) { toast('该卡牌已存在'); return; }
+
   const card = {
-    id: uid(), name: cardName, img, pos: allCards.length,
-    set_code: '', card_number: null, card_type: '', domains: [],
+    id: uid(), name, img, pos: allCards.length,
+    set_code: '', card_number: null, card_type, domains,
   };
   allCards.push(card);
   document.getElementById('inName').value = '';
   document.getElementById('inImg').value  = '';
-  document.getElementById('ocrStatus').textContent = '';
+  // 重置分类选择
+  document.getElementById('inCardType').value = '';
+  document.querySelectorAll('#inDomains input').forEach(el => el.checked = false);
+  onCardTypeChange();
   renderAll();
   setSyncState('syncing', '同步中…');
   try {
     await sbUpsert('cards', {
       id: card.id, name: card.name, img: card.img || null,
-      pos: card.pos, set_code: null, card_number: null, card_type: null, domains: null,
+      pos: card.pos, set_code: null, card_number: null,
+      card_type: card.card_type || null,
+      domains: card.domains.length ? card.domains : null,
     });
     setSyncState('live', '已同步');
-    toast('已添加：' + cardName);
+    toast('已添加：' + name);
   } catch(e) {
     console.error('addCard error', e); setSyncState('err', '同步失败');
   }
+}
+
+// 卡牌类型切换时显示/隐藏特性选择
+function onCardTypeChange() {
+  const t = document.getElementById('inCardType').value;
+  const domainRow = document.getElementById('inDomainsRow');
+  if (domainRow) domainRow.style.display =
+    (t === 'legend' || t === 'battlefield') ? 'none' : '';
 }
 
 async function delCard(id) {
@@ -1213,52 +1235,6 @@ function showSkeleton() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  OCR
-// ═══════════════════════════════════════════════════════════
-function onImgInput() {
-  const url = document.getElementById('inImg').value.trim();
-  document.getElementById('ocrBtn').style.opacity = url ? '1' : '0.4';
-}
-
-async function runOCR() {
-  const url = document.getElementById('inImg').value.trim();
-  if (!url) { toast('请先填入卡图 URL'); return; }
-  const btn = document.getElementById('ocrBtn');
-  const status = document.getElementById('ocrStatus');
-  btn.classList.add('loading'); btn.textContent = '识别中…';
-  status.textContent = '正在调用 AI…';
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-calls': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 64,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'url', url } },
-          { type: 'text',  text: '这是一张 Riftbound TCG 卡牌。请只回答卡牌名称（中文名），不要任何其他文字。无法识别则回答"未知"。' }
-        ]}],
-      }),
-    });
-    const data = await resp.json();
-    const name = data?.content?.[0]?.text?.trim() || '';
-    if (name && name !== '未知') {
-      document.getElementById('inName').value = name;
-      status.textContent = `✓ ${name}`; status.style.color = '#7ecba1';
-    } else {
-      status.textContent = '无法识别，请手动输入'; status.style.color = 'var(--text-dim)';
-    }
-  } catch {
-    status.textContent = 'AI 识别失败'; status.style.color = '#d07070';
-  }
-  btn.classList.remove('loading'); btn.textContent = '识别';
-}
-
-// ═══════════════════════════════════════════════════════════
 //  SYNC STATE UI
 // ═══════════════════════════════════════════════════════════
 function setSyncState(state, label) {
@@ -1281,7 +1257,6 @@ function toast(msg) {
 //  KEY BINDINGS
 // ═══════════════════════════════════════════════════════════
 document.getElementById('inName').addEventListener('keydown', e => { if (e.key === 'Enter') addCard(); });
-document.getElementById('inImg').addEventListener('keydown',  e => { if (e.key === 'Enter') addCard(); });
 document.getElementById('importOv').addEventListener('click', e => { if (e.target === e.currentTarget) closeImport(); });
 document.getElementById('cmpOv').addEventListener('click',   e => { if (e.target === e.currentTarget) closeCmp(); });
 

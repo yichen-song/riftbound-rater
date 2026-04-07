@@ -71,13 +71,26 @@
     <div class="sb-sec">
       <div class="sb-title">添加单卡</div>
       <div class="add-form">
-        <div class="url-row">
-          <input type="url" id="inImg" placeholder="卡图 URL（可选）" oninput="onImgInput()" />
-          <button class="ocr-btn" id="ocrBtn" onclick="runOCR()" title="AI 识别卡名">识别</button>
+        <input type="text" id="inName" placeholder="卡牌名称 *" />
+        <input type="url"  id="inImg"  placeholder="卡图 URL（可选）" />
+        <select id="inCardType" onchange="onCardTypeChange()">
+          <option value="">— 选择类型 *—</option>
+          <option value="legend">传奇</option>
+          <option value="battlefield">战场</option>
+          <option value="spell">普通牌</option>
+        </select>
+        <div id="inDomainsRow" style="display:none">
+          <div class="add-form-label">特性（可多选）</div>
+          <div id="inDomains" class="domain-checks">
+            <label><input type="checkbox" value="炽烈"><span style="color:#e05252">炽烈</span></label>
+            <label><input type="checkbox" value="翠意"><span style="color:#52b96e">翠意</span></label>
+            <label><input type="checkbox" value="灵光"><span style="color:#5b9fe0">灵光</span></label>
+            <label><input type="checkbox" value="摧破"><span style="color:#e07d30">摧破</span></label>
+            <label><input type="checkbox" value="混沌"><span style="color:#9b6de0">混沌</span></label>
+            <label><input type="checkbox" value="序理"><span style="color:#d4b935">序理</span></label>
+          </div>
         </div>
-        <div class="ocr-status" id="ocrStatus"></div>
-        <input type="text" id="inName" placeholder="卡牌名称" />
-        <button class="btn btn-gold" onclick="addCard()" style="width:100%;margin-top:1px">+ 添加</button>
+        <button class="btn btn-gold" onclick="addCard()" style="width:100%;margin-top:2px">+ 添加</button>
       </div>
     </div>
 
