@@ -1161,10 +1161,10 @@ function renderCards() {
         </div>
         <div class="box-label">强度评语</div>
         <textarea class="comment-box" rows="2"
-          placeholder=""
+          placeholder="${activeFormat === 'constructed' ? '构筑思路…' : '限制心得…'}"
           oninput="updateComment('${c.id}',this.value)">${comment}</textarea>
         <div class="box-label" style="margin-top:4px">使用心得</div>
-        <textarea class="note-box" rows="2" placeholder=""
+        <textarea class="note-box" rows="2" placeholder="心得备注…"
           oninput="updateNote('${c.id}',this.value)">${note}</textarea>
       </div>
     </div>`;
@@ -1191,25 +1191,19 @@ function renderStats() {
   const tabCards = getCardsForTab(activeTab, allCards);
   if (!tabCards.length) { sec.innerHTML = ''; return; }
   const total = tabCards.length;
-  let html = `<div class="sb-title">当前页统计</div>`;
-  for (const g of G) {
-    const n   = tabCards.filter(c => myGrade(c.id) === g).length;
-    const pct = Math.round(n / total * 100);
-    html += `<div class="st-row">
-      <div class="st-left">
-        <div class="st-badge" style="background:${GC[g]};color:${GF[g]}">${g}</div>
-        <span class="st-desc"></span>
-      </div>
-      <div class="st-num">${n}</div>
-    </div>
-    <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${GC[g]}"></div></div>`;
-  }
+  // 4列网格：S A B C / D E 未评 —
+  const cells = G.map(g => {
+    const n = tabCards.filter(c => myGrade(c.id) === g).length;
+    return `<div class="st-cell">
+      <div class="st-badge" style="background:${GC[g]};color:${GF[g]}">${g}</div>
+      <div class="st-num" style="color:${n ? 'var(--text)' : 'var(--text-dim)'}">${n}</div>
+    </div>`;
+  }).join('');
   const ur = tabCards.filter(c => !myGrade(c.id)).length;
-  html += `<div class="st-row" style="margin-top:3px">
-    <span class="st-desc">未评级</span>
-    <div class="st-num" style="font-size:13px">${ur}</div>
-  </div>`;
-  sec.innerHTML = html;
+  sec.innerHTML = `
+    <div class="sb-title">当前页统计</div>
+    <div class="st-grid">${cells}</div>
+    <div class="st-unrated"><span>未评级</span><span>${ur} / ${total}</span></div>`;
 }
 
 // ── Progress bar ──────────────────────────────────────────────
