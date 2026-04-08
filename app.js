@@ -110,9 +110,12 @@ async function sbFetch(path, method = 'GET', body = null) {
 }
 
 // Upsert（通用）：传入表名和行数据（单行或数组）
-async function sbUpsert(table, rows) {
-  const hdrs = { ...SB_HDR(), 'Prefer': 'resolution=merge-duplicates,return=minimal' };
-  const r = await fetch(SB_URL + '/rest/v1/' + table, {
+// onConflict: 指定 unique constraint 列（逗号分隔），用于非主键 unique 约束的 upsert
+async function sbUpsert(table, rows, onConflict = null) {
+  const prefer = 'resolution=merge-duplicates,return=minimal';
+  const hdrs = { ...SB_HDR(), 'Prefer': prefer };
+  const qs = onConflict ? `?on_conflict=${encodeURIComponent(onConflict)}` : '';
+  const r = await fetch(SB_URL + '/rest/v1/' + table + qs, {
     method: 'POST', headers: hdrs,
     body: JSON.stringify(Array.isArray(rows) ? rows : [rows]),
   });
@@ -781,7 +784,7 @@ async function saveGrade(cardId) {
       await sbUpsert('card_grades', {
         card_id: cardId, user_id: currentUser.id, format: activeFormat,
         grade: entry.grade || null, comment: entry.comment || '',
-      });
+      }, 'card_id,user_id,format');
     }
     setSyncState('live', '已同步');
   } catch(e) {
@@ -799,7 +802,7 @@ async function saveNote(cardId) {
         'DELETE'
       );
     } else {
-      await sbUpsert('card_notes', { card_id: cardId, user_id: currentUser.id, note: entry.note });
+      await sbUpsert('card_notes', { card_id: cardId, user_id: currentUser.id, note: entry.note }, 'card_id,user_id');
     }
     setSyncState('live', '已同步');
   } catch(e) {
@@ -1317,6 +1320,7 @@ document.addEventListener('keydown', e => {
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (document.querySelector('.overlay.open')) return;
+  if (!e.key) return;
   const key = e.key.toUpperCase();
   if (G.includes(key) && focusedCardId) {
     e.preventDefault(); setGrade(focusedCardId, key); return;
