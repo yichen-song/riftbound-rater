@@ -1310,7 +1310,6 @@ function toast(msg) {
 document.getElementById('inName').addEventListener('keydown', e => { if (e.key === 'Enter') addCard(); });
 document.getElementById('importOv').addEventListener('click', e => { if (e.target === e.currentTarget) closeImport(); });
 document.getElementById('cmpOv').addEventListener('click',   e => { if (e.target === e.currentTarget) closeCmp(); });
-document.getElementById('setsOv').addEventListener('click',  e => { if (e.target === e.currentTarget) closeSets(); });
 document.getElementById('statsOv').addEventListener('click', e => { if (e.target === e.currentTarget) closeStats(); });
 
 // S/A/B/C/D/E → 评级聚焦卡 | Escape → 取消 | ← → → 导航
@@ -1620,142 +1619,13 @@ function renderStatsModal() {
 // ═══════════════════════════════════════════════════════════
 //  SETS MANAGEMENT
 // ═══════════════════════════════════════════════════════════
-function openSets() {
-  renderSetsTable();
-  document.getElementById('setsOv').classList.add('open');
-}
 
-function closeSets() {
-  document.getElementById('setsOv').classList.remove('open');
-}
 
-function renderSetsTable() {
-  const wrap = document.getElementById('setsTableWrap');
-  const rows = Object.entries(sets).sort((a, b) => a[0].localeCompare(b[0]));
 
-  if (!rows.length) {
-    wrap.innerHTML = `<div class="sets-empty">暂无系列，点击「新增系列」添加</div>`;
-    return;
-  }
 
-  wrap.innerHTML = `
-    <table class="sets-table">
-      <thead>
-        <tr><th>代码</th><th>名称</th><th></th></tr>
-      </thead>
-      <tbody>
-        ${rows.map(([code, name]) => `
-          <tr data-code="${code}">
-            <td><input class="sets-code-input" value="${code}"
-              onchange="updateSetCode('${code}',this)" /></td>
-            <td><input class="sets-name-input" value="${name}"
-              onblur="saveSetName('${code}',this.value)" /></td>
-            <td style="width:48px;text-align:right">
-              <button class="btn btn-danger btn-sm" onclick="deleteSet('${code}')">删</button>
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
-}
 
-// 新增一行（临时占位，用户填写后 blur 保存）
-function addSetRow() {
-  const wrap = document.getElementById('setsTableWrap');
 
-  // 若已有空白 code 输入框则聚焦，不重复添加
-  const existing = wrap.querySelector('.sets-code-input[value=""]');
-  if (existing) { existing.focus(); return; }
 
-  // 若表格不存在（无数据时），先渲染骨架
-  let tbody = wrap.querySelector('tbody');
-  if (!tbody) {
-    wrap.innerHTML = `
-      <table class="sets-table">
-        <thead><tr><th>代码</th><th>名称</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>`;
-    tbody = wrap.querySelector('tbody');
-  }
-
-  const tr = document.createElement('tr');
-  tr.dataset.code = '';
-  tr.innerHTML = `
-    <td><input class="sets-code-input" placeholder="UNL" /></td>
-    <td><input class="sets-name-input" placeholder="破限" /></td>
-    <td style="width:48px;text-align:right">
-      <button class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">删</button>
-    </td>`;
-  tbody.appendChild(tr);
-
-  const codeInput = tr.querySelector('.sets-code-input');
-  const nameInput = tr.querySelector('.sets-name-input');
-  // 两个字段都 blur 时尝试保存（只要 code 和 name 都有值）
-  codeInput.addEventListener('blur', () => setTimeout(() => saveNewSet(tr, codeInput, nameInput), 80));
-  nameInput.addEventListener('blur', () => setTimeout(() => saveNewSet(tr, codeInput, nameInput), 80));
-  codeInput.focus();
-}
-
-async function saveNewSet(tr, codeInput, nameInput) {
-  // 如果焦点刚移到同行另一个输入框，延迟后仍在同行则跳过
-  if (tr.contains(document.activeElement)) return;
-  const code = codeInput.value.trim().toUpperCase();
-  const name = nameInput.value.trim();
-  if (!code || !name) return;
-  if (sets[code] !== undefined) { toast(`系列代码 ${code} 已存在`); return; }
-  try {
-    await sbUpsert('sets', { code, name });
-    sets[code] = name;
-    renderSetsTable();
-    toast(`已添加系列：${code} · ${name}`);
-  } catch(e) {
-    toast('保存失败：' + e.message);
-  }
-}
-
-async function saveSetName(oldCode, newName) {
-  const name = newName.trim();
-  if (!name || sets[oldCode] === name) return;
-  try {
-    await sbUpsert('sets', { code: oldCode, name });
-    sets[oldCode] = name;
-    toast(`已更新：${oldCode} → ${name}`);
-  } catch(e) {
-    toast('保存失败：' + e.message);
-  }
-}
-
-// code 变更（PK 变更：插新 + 删旧）
-async function updateSetCode(oldCode, input) {
-  const newCode = input.value.trim().toUpperCase();
-  input.value = newCode;   // 强制大写回显
-  if (!newCode || newCode === oldCode) { input.value = oldCode; return; }
-  if (sets[newCode] !== undefined) {
-    toast(`代码 ${newCode} 已存在`); input.value = oldCode; return;
-  }
-  const name = sets[oldCode];
-  try {
-    await sbUpsert('sets', { code: newCode, name });
-    await sbFetch(`sets?code=eq.${encodeURIComponent(oldCode)}`, 'DELETE');
-    delete sets[oldCode];
-    sets[newCode] = name;
-    renderSetsTable();
-    toast(`代码已更新：${oldCode} → ${newCode}`);
-  } catch(e) {
-    toast('更新失败：' + e.message); input.value = oldCode;
-  }
-}
-
-async function deleteSet(code) {
-  if (!confirm(`确定删除系列「${code} · ${sets[code]}」？\n注意：使用此代码的卡牌 set_code 不会自动清空。`)) return;
-  try {
-    await sbFetch(`sets?code=eq.${encodeURIComponent(code)}`, 'DELETE');
-    delete sets[code];
-    renderSetsTable();
-    toast(`已删除系列：${code}`);
-  } catch(e) {
-    toast('删除失败：' + e.message);
-  }
-}
 
 // ═══════════════════════════════════════════════════════════
 //  BOOT

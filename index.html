@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Riftbound · 单卡评级</title>
-<link rel="stylesheet" href="style.css?v=a48d093">
+<link rel="stylesheet" href="style.css?v=e78244b">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -57,7 +57,6 @@
       <button class="btn btn-ghost btn-sm" onclick="doLogout()">退出</button>
     </div>
     <button class="btn btn-ghost btn-sm" onclick="openStats()">📊 统计</button>
-    <button class="btn btn-ghost btn-sm" onclick="openSets()">⚙ 系列</button>
     <button class="btn btn-ghost btn-sm" onclick="openImport()">导入卡牌</button>
     <button class="btn btn-ghost btn-sm" onclick="openCompare()">⚖ 对比</button>
     <button class="btn btn-danger btn-sm" onclick="clearTab()">清空此页</button>
@@ -127,10 +126,6 @@
 </div><!-- /main-screen -->
 </div><!-- /app -->
 
-<!-- ── Sets Modal ── -->
-<div class="overlay" id="setsOv">
-  <div class="modal">
-    <div class="modal-title">⚙ 系列管理</div>
     <div class="hint" style="margin-bottom:14px">
       维护系列代码与全名对照。代码为大写缩写（如 <b>UNL</b>），全名为中文显示名（如 <b>破限</b>）。
     </div>
@@ -277,6 +272,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=a48d093"></script>
+<script src="app.js?v=e78244b"></script>
 </body>
 </html>
