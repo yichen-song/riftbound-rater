@@ -366,9 +366,7 @@ function isValidCard(cardNo, setCode) {
   const parsed = parseCardNo(cardNo);
   if (!parsed) return false;
   if (parsed.prefix !== setCode) return false;
-  if (/^[TR]/i.test(parsed.num)) return false;
-  if (/[a-zA-Z]/.test(parsed.num)) return false;
-  return true;
+  return /^\d+$/.test(parsed.num);  // 序号必须是纯数字
 }
 
 // ═══ 爬取 ═══
