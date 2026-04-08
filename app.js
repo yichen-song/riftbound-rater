@@ -296,11 +296,10 @@ async function doLogin() {
   btn.classList.remove('loading'); btn.textContent = '登录';
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  ['authEmail','authPassword'].forEach(id => {
-    document.getElementById(id)?.addEventListener('keydown', e => {
-      if (e.key === 'Enter') doLogin();
-    });
+// script 在 </body> 前加载，DOM 已就绪，无需 DOMContentLoaded 包装
+['authEmail','authPassword'].forEach(id => {
+  document.getElementById(id)?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
   });
 });
 
@@ -365,6 +364,7 @@ function saveSession(data) {
       access_token:  data.access_token,
       refresh_token: data.refresh_token,
       expires_in:    data.expires_in,
+      expires_at:    Date.now() + (data.expires_in ?? 3600) * 1000,  // 存绝对时间戳，确保刷新页面后能正确判断是否过期
       user:          data.user,
     }));
   } catch {}
