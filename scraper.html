@@ -349,6 +349,28 @@ async function deleteSet(code) {
   } catch(e) { toast('删除失败：' + e.message); }
 }
 
+// ═══ 卡牌编号解析 ═══
+// 官网编号格式混用两种分隔符：SFD·001/221 或 UNL-001/219
+// 统一解析：提取系列前缀 + 序号
+function parseCardNo(cardNo) {
+  const m = cardNo.match(/^([A-Z]+)[·\-](.+)$/);
+  if (!m) return null;
+  return { prefix: m[1], num: m[2].split('/')[0] };
+}
+
+// 判断是否为目标卡牌：
+// 1. 编号前缀与系列代码匹配
+// 2. 序号不以 T/R 开头（过滤指示物/符文）
+// 3. 序号不含字母（过滤异画/超编后缀）
+function isValidCard(cardNo, setCode) {
+  const parsed = parseCardNo(cardNo);
+  if (!parsed) return false;
+  if (parsed.prefix !== setCode) return false;
+  if (/^[TR]/i.test(parsed.num)) return false;
+  if (/[a-zA-Z]/.test(parsed.num)) return false;
+  return true;
+}
+
 // ═══ 爬取 ═══
 function checkAll()   { document.querySelectorAll('.set-cb:not(:disabled)').forEach(c => c.checked = true); }
 function uncheckAll() { document.querySelectorAll('.set-cb').forEach(c => c.checked = false); }
@@ -399,24 +421,17 @@ async function startScrape() {
     const officialCode = s.code;
     log('info', '处理系列：' + s.code);
 
-    // 匹配该系列的卡（productCodeList 包含该代码）
-    const setCards = allCards.filter(c =>
-      c.productCodeList.some(p => p.startsWith(officialCode + '(') || p === officialCode)
-    );
+    // 以编号为唯一标准：前缀=系列代码，序号纯数字，不含 T/R 前缀
+    const setCards = allCards.filter(c => isValidCard(c.cardNo, s.code));
     log('info', '  匹配到 ' + setCards.length + ' 张');
 
     for (const c of setCards) {
       if (stopFlag) break;
-      // 只保留平卡（base_inscript），过滤超编/异画/签名
-      if (c.extendRarity !== 'base_inscript') {
-        skipped++;
-        continue;
-      }
       results.push(mapCard(c, s.code));
       valid++;
     }
 
-    setStats(allCards.length, valid, skipped);
+    setStats(allCards.length, valid, allCards.length - valid);
     setProgress(targetSets.indexOf(s) + 1, targetSets.length, s.code);
     log('ok', '  ✓ 收录 ' + results.filter(r => r.set_code === s.code).length + ' 张有效卡牌');
   }
@@ -444,7 +459,8 @@ function mapCard(c, setCode) {
   const card_type = CATEGORY_MAP[c.cardCategory] || c.cardCategory || 'unknown';
   const domains   = (c.cardColorList || []).map(col => COLOR_MAP[col] || col).filter(Boolean);
   // 编号：官网格式 "UNL·001"，转成 "UNL-001"
-  const card_number = (c.cardNo || '').replace('·', '-');
+  // 统一编号格式：SFD·001/221 或 UNL-001/219 → SFD-001
+  const card_number = (c.cardNo || '').replace('·', '-').split('/')[0];
   return {
     name:        c.cardName,
     img:         c.frontImage || '',
