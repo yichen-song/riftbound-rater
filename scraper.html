@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Riftbound · 卡牌爬取工具</title>
-<!-- v=034a6ef -->
+<!-- v=3ac8ede -->
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0e0f13;--surface:#16181f;--surface2:#1c1f28;--border:#2a2d3a;--border2:#222535;--text:#d0d4e0;--mid:#8890a8;--muted:#4a5068;--gold:#c9a84c;--accent:#5b8dee;--success:#3ecf8e;--warn:#e8a93a;--danger:#e05c5c;--mono:'Courier New',monospace;--sans:'Noto Sans SC',sans-serif;--display:'Cinzel',serif}
@@ -355,21 +355,18 @@ async function deleteSet(code) {
 function parseCardNo(cardNo) {
   const m = cardNo.match(/^([A-Z]+)[·\-](.+)$/);
   if (!m) return null;
-  const parts = m[2].split('/');
-  return { prefix: m[1], num: parts[0], limit: parts[1] || null };
+  return { prefix: m[1], num: m[2].split('/')[0] };
 }
 
 // 判断是否为目标卡牌：
 // 1. 编号前缀与系列代码匹配
-// 2. 序号必须是纯数字（过滤 T/R 指示物/符文、异画/超编字母后缀）
-// 3. 序号 <= 斜杠后的编号上限（过滤超编）
+// 2. 序号不以 T/R 开头（过滤指示物/符文）
+// 3. 序号不含字母（过滤异画/超编后缀）
 function isValidCard(cardNo, setCode) {
   const parsed = parseCardNo(cardNo);
   if (!parsed) return false;
   if (parsed.prefix !== setCode) return false;
-  if (!/^\d+$/.test(parsed.num)) return false;
-  if (parsed.limit && parseInt(parsed.num) > parseInt(parsed.limit)) return false;
-  return true;
+  return /^\d+$/.test(parsed.num);  // 序号必须是纯数字
 }
 
 // ═══ 爬取 ═══
@@ -459,10 +456,9 @@ function stopScrape() {
 function mapCard(c, setCode) {
   const card_type = CATEGORY_MAP[c.cardCategory] || c.cardCategory || 'unknown';
   const domains   = (c.cardColorList || []).map(col => COLOR_MAP[col] || col).filter(Boolean);
-  // 编号：官网格式 "UNL·001"，转成 "UNL-001"
-  // 统一编号格式：SFD·001/221 或 UNL-001/219 → SFD-001
-  const parsed = parseCardNo(c.cardNo);
-  const card_number = parsed ? parsed.prefix + '-' + parsed.num.padStart(3, '0') : c.cardNo.replace('·', '-').split('/')[0];
+  // card_number 只存纯数字（主站显示时会拼 set_code + '-' + card_number）
+  const _parsed = parseCardNo(c.cardNo);
+  const card_number = _parsed ? parseInt(_parsed.num, 10) : null;
   return {
     name:        c.cardName,
     img:         c.frontImage || '',
