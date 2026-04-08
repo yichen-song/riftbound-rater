@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Riftbound · 卡牌爬取工具</title>
+<!-- v=e27972e -->
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0e0f13;--surface:#16181f;--surface2:#1c1f28;--border:#2a2d3a;--border2:#222535;--text:#d0d4e0;--mid:#8890a8;--muted:#4a5068;--gold:#c9a84c;--accent:#5b8dee;--success:#3ecf8e;--warn:#e8a93a;--danger:#e05c5c;--mono:'Courier New',monospace;--sans:'Noto Sans SC',sans-serif;--display:'Cinzel',serif}
@@ -12,25 +13,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13
 header{display:flex;align-items:center;gap:16px;padding:0 24px;height:52px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10}
 .logo{font-family:var(--display);font-size:15px;letter-spacing:.12em;color:var(--gold)}
 .logo small{display:block;font-size:8px;letter-spacing:.2em;color:var(--muted);font-family:var(--sans);margin-top:-2px}
-.header-badge{padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--mid)}
 .header-right{margin-left:auto;display:flex;align-items:center;gap:10px}
 .sync-pill{display:flex;align-items:center;gap:6px;padding:4px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--mid)}
 .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background .3s}
 .sync-dot.ok{background:var(--success);box-shadow:0 0 5px var(--success)}.sync-dot.err{background:var(--danger)}
 .sync-dot.spin{background:var(--warn);animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.layout{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 52px)}
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 52px)}
 .sidebar{border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;background:var(--surface)}
 .main-col{padding:24px;display:flex;flex-direction:column;gap:20px;overflow-y:auto}
 .card{background:var(--surface);border:1px solid var(--border2);border-radius:8px;overflow:hidden}
 .card-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border2);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--mid)}
-.card-head .actions{display:flex;gap:6px}
 .card-body{padding:14px}
 .field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.field:last-child{margin-bottom:0}
 .field label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-input[type=text],input[type=number],input[type=password],select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px;font-family:var(--sans);font-size:12px;outline:none;width:100%;transition:border-color .15s}
+input[type=text],input[type=number],select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px;font-family:var(--sans);font-size:12px;outline:none;width:100%;transition:border-color .15s}
 input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var(--muted)}
-input[type=number]{font-family:var(--mono)}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;border-radius:5px;border:none;cursor:pointer;font-family:var(--sans);font-size:12px;font-weight:600;transition:opacity .15s,transform .1s;white-space:nowrap}
 .btn:hover{opacity:.85}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
 .btn-gold{background:var(--gold);color:#1a1200}.btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
@@ -41,12 +39,12 @@ input[type=number]{font-family:var(--mono)}
 .set-item input[type=checkbox]{accent-color:var(--gold);width:13px;height:13px;flex-shrink:0}
 .set-item-code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold);min-width:36px}
 .set-item-name{font-size:12px;color:var(--text);flex:1}
-.set-item-warn{font-size:10px;color:var(--warn)}.set-item-ok{font-size:10px;color:var(--success)}
+.set-item-count{font-size:10px;color:var(--muted)}
 .sets-cfg-table{width:100%;border-collapse:collapse}
 .sets-cfg-table th,.sets-cfg-table td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--border2)}
 .sets-cfg-table th{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .sets-cfg-table td{font-size:12px}.sets-cfg-table tr:last-child td{border-bottom:none}
-.sets-cfg-table input{background:transparent;border:1px solid transparent;color:var(--text);padding:3px 7px;border-radius:4px;font-family:var(--mono);font-size:12px;width:100%;outline:none}
+.sets-cfg-table input{background:transparent;border:1px solid transparent;color:var(--text);padding:3px 7px;border-radius:4px;font-family:var(--sans);font-size:12px;width:100%;outline:none}
 .sets-cfg-table input:focus{border-color:var(--accent);background:var(--bg)}
 .sets-cfg-table input.saving{border-color:var(--warn)}.sets-cfg-table input.saved{border-color:var(--success)}
 .code-badge{display:inline-block;padding:2px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold)}
@@ -66,20 +64,14 @@ input[type=number]{font-family:var(--mono)}
 .result-table tr:hover td{background:var(--surface2)}
 .tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:var(--surface2);border:1px solid var(--border);color:var(--text);margin:1px 1px 1px 0}
 .tag-domain{background:#12202e;border-color:#2a4060;color:#7ab8e8}
-.token-guide{background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.9;margin-bottom:10px}
-.token-guide code{font-family:var(--mono);color:var(--gold);background:var(--surface2);padding:1px 5px;border-radius:3px}
-.token-status{font-size:11px;margin-top:6px;color:var(--muted)}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 18px;border-radius:20px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:999;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid var(--border)}}
 </style>
-<!-- v=3e12c37 -->
 </head>
 <body>
-
 <header>
   <div class="logo">RIFTBOUND<small>SCRAPER</small></div>
-  <div class="header-badge">卡牌数据爬取工具</div>
   <div class="header-right">
     <div class="sync-pill">
       <div class="sync-dot" id="sbDot"></div>
@@ -87,49 +79,13 @@ input[type=number]{font-family:var(--mono)}
     </div>
   </div>
 </header>
-
 <div class="layout">
 <aside class="sidebar">
-
-  <div class="card">
-    <div class="card-head">SFC 认证</div>
-    <div class="card-body">
-      <div class="token-guide">
-        登录 <a href="https://staticaforestcard.com" target="_blank" style="color:var(--accent)">staticaforestcard.com</a> 后按 F12：<br>
-        Application &rarr; Local Storage &rarr;<br>
-        <code>sfcard_user</code> &rarr; userData &rarr; <code>login_token</code>
-      </div>
-      <div class="field">
-        <label>Login Token</label>
-        <input type="password" id="tokenInput" placeholder="粘贴 login_token 的值…" />
-      </div>
-      <button class="btn btn-ghost btn-full" onclick="saveToken()">&#10003; 保存 Token</button>
-      <div class="token-status" id="tokenStatus">—</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-head">爬取设置</div>
-    <div class="card-body">
-      <div class="field">
-        <label>并发数</label>
-        <select id="concurrency">
-          <option value="1">1（最安全）</option>
-          <option value="3" selected>3（推荐）</option>
-          <option value="5">5（较快）</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>请求间隔 (ms)</label>
-        <input type="number" id="delay" value="200" min="50" max="3000" />
-      </div>
-    </div>
-  </div>
 
   <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
     <div class="card-head">
       选择系列
-      <div class="actions">
+      <div style="display:flex;gap:6px">
         <button class="btn btn-sm btn-ghost" onclick="checkAll()">全选</button>
         <button class="btn btn-sm btn-ghost" onclick="uncheckAll()">清空</button>
       </div>
@@ -141,41 +97,38 @@ input[type=number]{font-family:var(--mono)}
     </div>
   </div>
 
-  <button class="btn btn-gold btn-full" id="startBtn" onclick="startScrape()" disabled>&#9654; 开始爬取</button>
-  <button class="btn btn-ghost btn-full" id="stopBtn" onclick="stopScrape()" disabled style="margin-top:-6px">&#9632; 停止</button>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <button class="btn btn-gold btn-full" id="startBtn" onclick="startScrape()" disabled>&#9654; 开始爬取</button>
+    <button class="btn btn-ghost btn-full" id="stopBtn" onclick="stopScrape()" disabled>&#9632; 停止</button>
+  </div>
 
 </aside>
-
 <main class="main-col">
 
+  <!-- 系列配置 -->
   <div class="card">
     <div class="card-head">
       系列配置
-      <div class="actions">
+      <div style="display:flex;gap:6px">
         <button class="btn btn-sm btn-ghost" onclick="loadSets()">&#8635; 刷新</button>
       </div>
     </div>
     <div class="card-body" style="padding:0">
-      <div style="overflow-x:auto">
-        <table class="sets-cfg-table">
-          <thead>
-            <tr>
-              <th>代码</th><th>名称</th>
-              <th>Card ID 起始</th><th>Card ID 结束</th>
-              <th>编号上限（超过为超编/异画）</th>
-            </tr>
-          </thead>
-          <tbody id="setCfgBody">
-            <tr><td colspan="5" style="color:var(--muted);padding:16px;text-align:center">加载中…</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <table class="sets-cfg-table">
+        <thead>
+          <tr><th>代码</th><th>名称</th><th>官网系列代码<span style="font-weight:400;text-transform:none;margin-left:4px;color:var(--muted)">productCode 括号前的部分</span></th></tr>
+        </thead>
+        <tbody id="setCfgBody">
+          <tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">加载中…</td></tr>
+        </tbody>
+      </table>
       <div style="padding:10px 16px;border-top:1px solid var(--border2);font-size:11px;color:var(--muted)">
-        直接在表格内编辑，失焦自动保存到数据库。Card ID 为 SFC 内部 ID，可在 SFC 站点 hover 卡牌时 F12 &rarr; Network &rarr; card-detail 请求的 body 中查看。
+        官网系列代码用于从 playloltcg.com 匹配卡牌。失焦自动保存。已知代码：UNL · SFD · OGN · OGS · ARC
       </div>
     </div>
   </div>
 
+  <!-- 进度 -->
   <div class="card" id="progressCard" style="display:none">
     <div class="card-head">
       爬取进度
@@ -183,10 +136,9 @@ input[type=number]{font-family:var(--mono)}
     </div>
     <div class="card-body">
       <div class="stat-row">
-        <div class="stat-box"><div class="stat-num" id="sCrawled">0</div><div class="stat-label">已请求</div></div>
+        <div class="stat-box"><div class="stat-num" id="sFetched">0</div><div class="stat-label">官网总卡数</div></div>
         <div class="stat-box"><div class="stat-num" id="sValid">0</div><div class="stat-label">有效卡牌</div></div>
-        <div class="stat-box"><div class="stat-num" id="sSkipped">0</div><div class="stat-label">跳过</div></div>
-        <div class="stat-box"><div class="stat-num" id="sError">0</div><div class="stat-label">错误</div></div>
+        <div class="stat-box"><div class="stat-num" id="sSkipped">0</div><div class="stat-label">跳过（超编等）</div></div>
       </div>
       <div class="prog-wrap">
         <div class="prog-label"><span id="progSetLabel">—</span><span id="progPct">0%</span></div>
@@ -196,10 +148,11 @@ input[type=number]{font-family:var(--mono)}
     </div>
   </div>
 
+  <!-- 结果 -->
   <div class="card" id="resultCard" style="display:none">
     <div class="card-head">
       爬取结果
-      <div class="actions">
+      <div style="display:flex;gap:6px">
         <button class="btn btn-sm btn-ghost" onclick="exportJSON()">&#8595; 导出 JSON</button>
         <button class="btn btn-sm btn-ghost" onclick="exportCSV()">&#8595; 导出 CSV</button>
       </div>
@@ -208,10 +161,7 @@ input[type=number]{font-family:var(--mono)}
       <div class="result-scroll">
         <table class="result-table">
           <thead>
-            <tr>
-              <th>card_id</th><th>中文名</th><th>系列</th><th>编号</th>
-              <th>序号</th><th>类型</th><th>domains（颜色）</th><th>稀有度</th>
-            </tr>
+            <tr><th>中文名</th><th>系列</th><th>编号</th><th>类型</th><th>domains（颜色）</th><th>稀有度</th></tr>
           </thead>
           <tbody id="resultBody"></tbody>
         </table>
@@ -225,15 +175,35 @@ input[type=number]{font-family:var(--mono)}
 <script>
 'use strict';
 // ═══ CONFIG（与主站 app.js 保持同步）═══
-const SB_URL='https://vepqjryrhvuehwemabqu.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlcHFqcnlyaHZ1ZWh3ZW1hYnF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjA2MjYsImV4cCI6MjA5MDQzNjYyNn0.8ZWqTUwEQX1zFwTCLx7eqwfocDmw5DId2rrxoxDjrPk';
-const SFC_API='https://api.staticaforestcard.com/api/card-detail';
-const SFC_HEAD={'Content-Type':'application/x-www-form-urlencoded','Client-Version':'1.0.0','Game-Id':'1003','platform':'web'};
-const TYPE_MAP={'单位':'unit','法术':'spell','圣物':'relic','传奇':'legend','战场':'battlefield','符文':'rune'};
+const SB_URL = 'https://vepqjryrhvuehwemabqu.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlcHFqcnlyaHZ1ZWh3ZW1hYnF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjA2MjYsImV4cCI6MjA5MDQzNjYyNn0.8ZWqTUwEQX1zFwTCLx7eqwfocDmw5DId2rrxoxDjrPk';
 
-let sets=[],results=[],sfcToken='',stopFlag=false;
+// ═══ 官网 API（无需认证）═══
+const OFFICIAL_API = 'https://lol-api.playloltcg.com/xcx/card/searchCardCraftWeb';
+
+// ═══ 字段映射 ═══
+// 官网 cardCategory → 项目 card_type
+const CATEGORY_MAP = {
+  'unit':'unit', 'hero_unit':'unit', 'exclusive_unit':'unit',
+  'indicator_unit':'unit',
+  'spell':'spell', 'exclusive_spell':'spell',
+  'equipment':'relic', 'exclusive_equipment':'relic',
+  'indicator_equipment':'relic',
+  'legendary':'legend',
+  'battlefield':'battlefield', 'indicator_battlefield':'battlefield',
+  'rune':'rune',
+};
+// 官网颜色英文值 → 项目 domains 中文特性名
+const COLOR_MAP = {
+  'red':'炽烈', 'green':'翠意', 'blue':'灵光',
+  'orange':'摧破', 'purple':'混沌', 'yellow':'序理',
+  'colorless':'无色',
+};
+
+let sets = [], results = [], stopFlag = false;
+
+// ═══ 初始化 ═══
 function SB_HDR() {
-  // 复用主站 localStorage 里的 Supabase access_token（同域共享）
   let token = SB_KEY;
   try {
     const s = JSON.parse(localStorage.getItem('rb_session') || '{}');
@@ -242,239 +212,268 @@ function SB_HDR() {
   return { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + token };
 }
 
-// ═══ 初始化 ═══
-
-(async function init(){
-  sfcToken=localStorage.getItem('rb_sfc_token')||'';
-  if(sfcToken){
-    document.getElementById('tokenStatus').textContent='✓ 已保存（'+sfcToken.slice(0,12)+'…）';
-    document.getElementById('tokenStatus').style.color='var(--success)';
-  }
-  setSbStatus('spin','连接中…');
-  // 检查主站 session
-  let hasSession = false;
-  try { hasSession = !!JSON.parse(localStorage.getItem('rb_session')||'{}').access_token; } catch(e) {}
-  if (!hasSession) {
-    setSbStatus('err', '未登录');
+(async function init() {
+  setSbStatus('spin', '连接中…');
+  try {
+    await loadSets();
+    setSbStatus('ok', '已连接');
+  } catch(e) {
+    setSbStatus('err', '连接失败');
     showLog();
-    log('warn', '⚠ 请先登录主站（同一浏览器），再回到此页面刷新');
-    updateStartBtn();
-    return;
+    log('err', 'Supabase 连接失败：' + e.message);
+    if (!JSON.parse(localStorage.getItem('rb_session') || '{}').access_token) {
+      log('warn', '⚠ 请先登录主站（同一浏览器），再刷新此页');
+    }
   }
-  try { await loadSets(); setSbStatus('ok', '已连接'); }
-  catch(e) { setSbStatus('err','连接失败'); showLog(); log('err','Supabase 连接失败：'+e.message); }
   updateStartBtn();
 })();
 
 // ═══ Supabase ═══
-async function sbGet(path){
-  const r=await fetch(SB_URL+'/rest/v1/'+path,{headers:SB_HDR()});
-  if(!r.ok)throw new Error('HTTP '+r.status+': '+await r.text());
-  const d=await r.json();
-  if(!Array.isArray(d))throw new Error('格式异常: '+JSON.stringify(d).slice(0,80));
+async function sbGet(path) {
+  const r = await fetch(SB_URL + '/rest/v1/' + path, { headers: SB_HDR() });
+  if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + await r.text());
+  const d = await r.json();
+  if (!Array.isArray(d)) throw new Error('格式异常: ' + JSON.stringify(d).slice(0, 80));
   return d;
 }
-async function sbPatch(path,body){
-  const r=await fetch(SB_URL+'/rest/v1/'+path,{method:'PATCH',headers:{...SB_HDR(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(body)});
-  if(!r.ok)throw new Error('HTTP '+r.status+': '+await r.text());
+async function sbPatch(path, body) {
+  const r = await fetch(SB_URL + '/rest/v1/' + path, {
+    method: 'PATCH',
+    headers: { ...SB_HDR(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + await r.text());
 }
 
-// ═══ 系列 ═══
-async function loadSets(){
-  sets=await sbGet('sets?order=code');
-  renderSetCfgTable();renderSetList();
+// ═══ 系列管理 ═══
+async function loadSets() {
+  sets = await sbGet('sets?order=code');
+  renderSetCfgTable();
+  renderSetList();
 }
-function renderSetCfgTable(){
-  const body=document.getElementById('setCfgBody');
-  if(!sets.length){body.innerHTML='<tr><td colspan="5" style="color:var(--muted);padding:16px;text-align:center">暂无系列——请先在主站添加</td></tr>';return;}
-  body.innerHTML=sets.map(s=>`
+
+function renderSetCfgTable() {
+  const body = document.getElementById('setCfgBody');
+  if (!sets.length) {
+    body.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">暂无系列——请先在主站添加</td></tr>';
+    return;
+  }
+  body.innerHTML = sets.map(s => `
     <tr data-code="${esc(s.code)}">
       <td><span class="code-badge">${esc(s.code)}</span></td>
       <td style="color:var(--mid)">${esc(s.name)}</td>
-      <td><input type="number" value="${s.id_start??''}" placeholder="如 4675" onblur="saveCfgField('${esc(s.code)}','id_start',this)"/></td>
-      <td><input type="number" value="${s.id_end??''}" placeholder="如 4900" onblur="saveCfgField('${esc(s.code)}','id_end',this)"/></td>
-      <td><input type="number" value="${s.max_card_number??''}" placeholder="如 219" onblur="saveCfgField('${esc(s.code)}','max_card_number',this)"/></td>
+      <td><input type="text" value="${esc(s.official_code || '')}" placeholder="如 UNL"
+        onblur="saveCfgField('${esc(s.code)}','official_code',this)" /></td>
     </tr>`).join('');
 }
-function renderSetList(){
-  const wrap=document.getElementById('setList');
-  if(!sets.length){wrap.innerHTML='<div style="color:var(--muted);font-size:11px;padding:4px">暂无系列</div>';return;}
-  wrap.innerHTML=sets.map(s=>{
-    const ready=s.id_start&&s.id_end&&s.max_card_number;
+
+function renderSetList() {
+  const wrap = document.getElementById('setList');
+  if (!sets.length) { wrap.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:4px">暂无系列</div>'; return; }
+  wrap.innerHTML = sets.map(s => {
+    const ready = !!s.official_code;
     return `<label class="set-item">
-      <input type="checkbox" class="set-cb" value="${esc(s.code)}" ${ready?'checked':''} ${ready?'':'disabled'}/>
+      <input type="checkbox" class="set-cb" value="${esc(s.code)}" ${ready ? 'checked' : ''} ${ready ? '' : 'disabled'} />
       <span class="set-item-code">${esc(s.code)}</span>
       <span class="set-item-name">${esc(s.name)}</span>
-      ${ready?`<span class="set-item-ok">${s.id_start}–${s.id_end}</span>`:`<span class="set-item-warn">⚠ 待配置</span>`}
+      <span class="${ready ? 'set-item-count' : 'set-item-count'}" style="color:${ready ? 'var(--success)' : 'var(--warn)'}">
+        ${ready ? s.official_code : '⚠ 待配置'}
+      </span>
     </label>`;
   }).join('');
   updateStartBtn();
 }
-async function saveCfgField(code,field,input){
-  const raw=input.value.trim();
-  const val=raw===''?null:parseInt(raw);
-  if(isNaN(val)&&val!==null)return;
-  const s=sets.find(x=>x.code===code);
-  if(s&&s[field]===val)return;
-  input.classList.add('saving');
-  try{
-    await sbPatch('sets?code=eq.'+encodeURIComponent(code),{[field]:val});
-    if(s)s[field]=val;
-    input.classList.remove('saving');input.classList.add('saved');
-    setTimeout(()=>input.classList.remove('saved'),1500);
-    renderSetList();updateStartBtn();toast(code+' · '+field+' 已保存');
-  }catch(e){input.classList.remove('saving');toast('保存失败：'+e.message);}
-}
 
-// ═══ Token ═══
-function saveToken(){
-  const t=document.getElementById('tokenInput').value.trim();
-  if(!t){toast('请先粘贴 login_token');return;}
-  sfcToken=t;localStorage.setItem('rb_sfc_token',sfcToken);
-  document.getElementById('tokenStatus').textContent='✓ 已保存（'+sfcToken.slice(0,12)+'…）';
-  document.getElementById('tokenStatus').style.color='var(--success)';
-  document.getElementById('tokenInput').value='';
-  updateStartBtn();toast('Token 已保存');
+async function saveCfgField(code, field, input) {
+  const val = input.value.trim().toUpperCase() || null;
+  const s = sets.find(x => x.code === code);
+  if (s && s[field] === val) return;
+  input.classList.add('saving');
+  try {
+    await sbPatch('sets?code=eq.' + encodeURIComponent(code), { [field]: val });
+    if (s) s[field] = val;
+    input.value = val || '';
+    input.classList.remove('saving'); input.classList.add('saved');
+    setTimeout(() => input.classList.remove('saved'), 1500);
+    renderSetList(); updateStartBtn();
+    toast(code + ' 已保存');
+  } catch(e) { input.classList.remove('saving'); toast('保存失败：' + e.message); }
 }
 
 // ═══ 爬取 ═══
-function checkAll(){document.querySelectorAll('.set-cb:not(:disabled)').forEach(c=>c.checked=true);}
-function uncheckAll(){document.querySelectorAll('.set-cb').forEach(c=>c.checked=false);}
-function updateStartBtn(){
-  document.getElementById('startBtn').disabled=!(sfcToken&&document.querySelector('.set-cb:checked'));
+function checkAll()   { document.querySelectorAll('.set-cb:not(:disabled)').forEach(c => c.checked = true); }
+function uncheckAll() { document.querySelectorAll('.set-cb').forEach(c => c.checked = false); }
+function updateStartBtn() {
+  document.getElementById('startBtn').disabled = !document.querySelector('.set-cb:checked');
 }
 
-async function startScrape(){
-  const selected=[...document.querySelectorAll('.set-cb:checked')].map(c=>c.value);
-  if(!selected.length){toast('请先勾选系列');return;}
-  if(!sfcToken){toast('请先保存 SFC Token');return;}
-  const targetSets=sets.filter(s=>selected.includes(s.code));
-  const tasks=[];
-  for(const s of targetSets)for(let id=s.id_start;id<=s.id_end;id++)tasks.push({card_id:id,set:s});
-  results=[];stopFlag=false;
-  document.getElementById('startBtn').disabled=true;
-  document.getElementById('stopBtn').disabled=false;
+async function startScrape() {
+  const selected = [...document.querySelectorAll('.set-cb:checked')].map(c => c.value);
+  if (!selected.length) { toast('请先勾选系列'); return; }
+
+  const targetSets = sets.filter(s => selected.includes(s.code));
+  results = []; stopFlag = false;
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
   showLog();
-  document.getElementById('resultCard').style.display='none';
-  document.getElementById('resultBody').innerHTML='';
-  document.getElementById('logBox').innerHTML='';
-  setStats(0,0,0,0);
-  const concurrency=parseInt(document.getElementById('concurrency').value);
-  const delay=parseInt(document.getElementById('delay').value)||200;
-  log('info','▶ 开始爬取：'+targetSets.map(s=>s.code).join(', ')+'　共 '+tasks.length+' 个 ID');
-  setProgress(0,tasks.length,targetSets[0]?.code);
-  let crawled=0,valid=0,skipped=0,errors=0;
-  async function runTask(task){
-    if(stopFlag)return;
-    try{
-      const data=await fetchCardDetail(task.card_id);
-      crawled++;
-      if(!data){skipped++;}
-      else{
-        const si=data.sindex;
-        if(Number.isInteger(si)&&si>0&&si<=task.set.max_card_number){
-          results.push(mapCard(data,task.set));valid++;
-          if(valid%20===0)log('ok','✓ 已收录 '+valid+' 张');
-        }else{
-          skipped++;
-          if(skipped<=3||skipped%30===0)log('warn','↷ 跳过 ID='+task.card_id+'  '+(data.card_no??'')+'  sindex='+si);
-        }
-      }
-    }catch(e){errors++;crawled++;log('err','✗ ID='+task.card_id+'  '+e.message.slice(0,60));}
-    setStats(crawled,valid,skipped,errors);setProgress(crawled,tasks.length,task.set.code);
-  }
-  for(let i=0;i<tasks.length;i+=concurrency){
-    if(stopFlag)break;
-    await Promise.all(tasks.slice(i,i+concurrency).map(runTask));
-    if(!stopFlag&&delay>0)await sleep(delay);
-  }
-  document.getElementById('startBtn').disabled=false;
-  document.getElementById('stopBtn').disabled=true;
-  const msg=stopFlag?'■ 已停止　收录 '+valid+' 张':'✓ 完成　共收录 '+valid+' 张有效卡牌';
-  log(stopFlag?'warn':'ok',msg);toast(msg);
-  if(results.length)renderResults();
-}
-function stopScrape(){stopFlag=true;document.getElementById('stopBtn').disabled=true;log('warn','■ 停止信号已发送…');}
+  document.getElementById('resultCard').style.display = 'none';
+  document.getElementById('resultBody').innerHTML = '';
+  document.getElementById('logBox').innerHTML = '';
+  setStats(0, 0, 0);
 
-// ═══ SFC API ═══
-async function fetchCardDetail(card_id){
-  const r=await fetch(SFC_API,{method:'POST',headers:{...SFC_HEAD,'Login-Token':sfcToken},body:'card_id='+card_id});
-  if(!r.ok)throw new Error('HTTP '+r.status);
-  const j=await r.json();if(j.code!==0)return null;return j.data;
+  log('info', '▶ 从官网 API 拉取全部卡牌数据…');
+  setProgress(0, 1, '请求中');
+
+  // 一次拉取全部数据（官网无需分页）
+  let allCards;
+  try {
+    const r = await fetch(OFFICIAL_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pageNum: 1, pageSize: 2000 })
+    });
+    const d = await r.json();
+    allCards = d.result?.list || [];
+    log('ok', '✓ 官网返回 ' + allCards.length + ' 张卡牌');
+  } catch(e) {
+    log('err', '官网 API 请求失败：' + e.message);
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+    return;
+  }
+
+  // 按选中系列过滤并处理
+  let valid = 0, skipped = 0;
+
+  for (const s of targetSets) {
+    if (stopFlag) break;
+    const officialCode = s.official_code;
+    if (!officialCode) { log('warn', '跳过 ' + s.code + '：未设置官网系列代码'); continue; }
+
+    log('info', '处理系列：' + s.code + ' → 官网代码 ' + officialCode);
+
+    // 匹配该系列的卡（productCodeList 包含该代码）
+    const setCards = allCards.filter(c =>
+      c.productCodeList.some(p => p.startsWith(officialCode + '(') || p === officialCode)
+    );
+    log('info', '  匹配到 ' + setCards.length + ' 张');
+
+    for (const c of setCards) {
+      if (stopFlag) break;
+      // 只保留平卡（base_inscript），过滤超编/异画/签名
+      if (c.extendRarity !== 'base_inscript') {
+        skipped++;
+        continue;
+      }
+      results.push(mapCard(c, s.code));
+      valid++;
+    }
+
+    setStats(allCards.length, valid, skipped);
+    setProgress(targetSets.indexOf(s) + 1, targetSets.length, s.code);
+    log('ok', '  ✓ 收录 ' + results.filter(r => r.set_code === s.code).length + ' 张有效卡牌');
+  }
+
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+  setProgress(1, 1, '完成');
+
+  const msg = stopFlag
+    ? '■ 已停止，收录 ' + valid + ' 张'
+    : '✓ 完成！共收录 ' + valid + ' 张有效卡牌，跳过 ' + skipped + ' 张超编/异画';
+  log(stopFlag ? 'warn' : 'ok', msg);
+  toast(msg);
+  if (results.length) renderResults();
+}
+
+function stopScrape() {
+  stopFlag = true;
+  document.getElementById('stopBtn').disabled = true;
+  log('warn', '■ 停止信号已发送…');
 }
 
 // ═══ 字段映射 ═══
-function mapCard(d,set){
-  const attrs={};
-  for(const a of(d.attr_detail||[]))if(a.name&&a.value!==''&&a.value!==null&&a.value!==0)attrs[a.name]=a.value;
-  const typeRaw=attrs['类型']||'';
-  const card_type=TYPE_MAP[typeRaw]||typeRaw.toLowerCase()||'unknown';
-  const colorRaw=attrs['颜色']||'';
-  const domains=colorRaw?colorRaw.split(/[,，、]/).map(x=>x.trim()).filter(Boolean):[];
-  return{name:d.name,img:d.img,set_code:d.series_abbr,card_number:d.card_no,card_type,domains,
-    _card_id:d.card_id,_sindex:d.sindex,_rarity:d.rarity,_raw_type:typeRaw,_raw_color:colorRaw};
+function mapCard(c, setCode) {
+  const card_type = CATEGORY_MAP[c.cardCategory] || c.cardCategory || 'unknown';
+  const domains   = (c.cardColorList || []).map(col => COLOR_MAP[col] || col).filter(Boolean);
+  // 编号：官网格式 "UNL·001"，转成 "UNL-001"
+  const card_number = (c.cardNo || '').replace('·', '-');
+  return {
+    name:        c.cardName,
+    img:         c.frontImage || '',
+    set_code:    setCode,
+    card_number,
+    card_type,
+    domains,
+    // 校验字段
+    _official_code: c.cardNo,
+    _rarity:        c.rarityName,
+    _extend_rarity: c.extendRarityName,
+    _category:      c.cardCategoryName,
+  };
 }
 
 // ═══ 结果渲染 ═══
-function renderResults(){
-  document.getElementById('resultCard').style.display='block';
-  document.getElementById('resultBody').innerHTML=results.map(c=>`
+function renderResults() {
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('resultBody').innerHTML = results.map(c => `
     <tr>
-      <td style="color:var(--muted);font-family:var(--mono)">${c._card_id}</td>
       <td style="font-weight:500">${esc(c.name)}</td>
       <td><span class="code-badge" style="font-size:10px">${esc(c.set_code)}</span></td>
       <td style="font-family:var(--mono);color:var(--mid)">${esc(c.card_number)}</td>
-      <td style="font-family:var(--mono);color:var(--muted)">${c._sindex}</td>
       <td><span class="tag">${esc(c.card_type)}</span></td>
-      <td>${c.domains.map(d=>'<span class="tag tag-domain">'+esc(d)+'</span>').join('')}</td>
+      <td>${c.domains.map(d => '<span class="tag tag-domain">' + esc(d) + '</span>').join('')}</td>
       <td style="color:var(--muted)">${esc(c._rarity)}</td>
     </tr>`).join('');
-  document.getElementById('resultCard').scrollIntoView({behavior:'smooth'});
+  document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
 }
 
 // ═══ 导出 ═══
-function exportJSON(){
-  const clean=results.map(({_card_id,_sindex,_rarity,_raw_type,_raw_color,...r})=>r);
-  download('riftbound_cards_'+ts()+'.json',JSON.stringify(clean,null,2),'application/json');
-  toast('JSON 已导出（'+clean.length+' 张）');
+function exportJSON() {
+  const clean = results.map(({ _official_code, _rarity, _extend_rarity, _category, ...r }) => r);
+  download('riftbound_cards_' + ts() + '.json', JSON.stringify(clean, null, 2), 'application/json');
+  toast('JSON 已导出（' + clean.length + ' 张）');
 }
-function exportCSV(){
-  const h=['name','set_code','card_number','card_type','domains','img'];
-  const rows=results.map(c=>[c.name,c.set_code,c.card_number,c.card_type,c.domains.join('|'),c.img]);
-  const csv=[h,...rows].map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
-  download('riftbound_cards_'+ts()+'.csv',csv,'text/csv');
-  toast('CSV 已导出（'+results.length+' 张）');
+function exportCSV() {
+  const h = ['name', 'set_code', 'card_number', 'card_type', 'domains', 'img'];
+  const rows = results.map(c => [c.name, c.set_code, c.card_number, c.card_type, c.domains.join('|'), c.img]);
+  const csv = [h, ...rows].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+  download('riftbound_cards_' + ts() + '.csv', csv, 'text/csv');
+  toast('CSV 已导出（' + results.length + ' 张）');
 }
-function download(name,content,type){
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));
-  a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+function download(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 // ═══ UI 工具 ═══
-function setSbStatus(state,msg){document.getElementById('sbDot').className='sync-dot '+state;document.getElementById('sbLabel').textContent=msg;}
-function showLog(){document.getElementById('progressCard').style.display='block';}
-function setProgress(done,total,setCode){
-  const pct=total?Math.round(done/total*100):0;
-  document.getElementById('progFill').style.width=pct+'%';
-  document.getElementById('progPct').textContent=pct+'%';
-  document.getElementById('progressText').textContent=done+' / '+total;
-  document.getElementById('progSetLabel').textContent=setCode||'';
+function setSbStatus(state, msg) { document.getElementById('sbDot').className = 'sync-dot ' + state; document.getElementById('sbLabel').textContent = msg; }
+function showLog() { document.getElementById('progressCard').style.display = 'block'; }
+function setProgress(done, total, label) {
+  const pct = total ? Math.round(done / total * 100) : 0;
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progPct').textContent = pct + '%';
+  document.getElementById('progressText').textContent = done + ' / ' + total;
+  document.getElementById('progSetLabel').textContent = label || '';
 }
-function setStats(c,v,s,e){
-  document.getElementById('sCrawled').textContent=c;document.getElementById('sValid').textContent=v;
-  document.getElementById('sSkipped').textContent=s;document.getElementById('sError').textContent=e;
+function setStats(fetched, valid, skipped) {
+  document.getElementById('sFetched').textContent = fetched;
+  document.getElementById('sValid').textContent   = valid;
+  document.getElementById('sSkipped').textContent = skipped;
 }
-function log(type,msg){
-  const box=document.getElementById('logBox');const line=document.createElement('div');
-  line.className='log-'+type;
-  line.textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false})+'  '+msg;
-  box.appendChild(line);box.scrollTop=box.scrollHeight;
+function log(type, msg) {
+  const box = document.getElementById('logBox');
+  const line = document.createElement('div');
+  line.className = 'log-' + type;
+  line.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false }) + '  ' + msg;
+  box.appendChild(line); box.scrollTop = box.scrollHeight;
 }
 let _tt;
-function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2500);}
-function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
-function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function ts(){return new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');}
+function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(_tt); _tt = setTimeout(() => el.classList.remove('show'), 2500); }
+function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function ts() { return new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-'); }
 </script>
 </body>
 </html>
