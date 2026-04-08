@@ -367,9 +367,11 @@ function saveSession(data) {
       access_token:  data.access_token,
       refresh_token: data.refresh_token,
       expires_in:    data.expires_in,
-      expires_at:    Date.now() + (data.expires_in ?? 3600) * 1000,  // 存绝对时间戳，确保刷新页面后能正确判断是否过期
+      expires_at:    Date.now() + (data.expires_in ?? 3600) * 1000,
       user:          data.user,
     }));
+    // 写入 Supabase 配置供 scraper 工具读取（同域名同浏览器）
+    localStorage.setItem('rb_sb_cfg', JSON.stringify({ url: SB_URL, key: SB_KEY }));
   } catch {}
 }
 
