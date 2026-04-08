@@ -105,6 +105,46 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
 </aside>
 <main class="main-col">
 
+  <!-- 系列管理 -->
+  <div class="card">
+    <div class="card-head">
+      系列管理
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-ghost" onclick="loadSets()">&#8635; 刷新</button>
+        <button class="btn btn-sm btn-gold" onclick="openAddSet()">&#43; 新增</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table class="sets-cfg-table">
+        <thead>
+          <tr><th>代码</th><th>名称</th><th></th></tr>
+        </thead>
+        <tbody id="setCfgBody">
+          <tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">加载中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 新增系列弹窗 -->
+  <div id="addSetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;width:320px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:14px">新增系列</div>
+      <div class="field">
+        <label>系列代码</label>
+        <input type="text" id="newSetCode" placeholder="如 UNL" style="text-transform:uppercase" />
+      </div>
+      <div class="field">
+        <label>系列名称</label>
+        <input type="text" id="newSetName" placeholder="如 破限" />
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-ghost" onclick="closeAddSet()">取消</button>
+        <button class="btn btn-gold" onclick="saveNewSet()">保存</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 进度 -->
   <div class="card" id="progressCard" style="display:none">
     <div class="card-head">
@@ -225,27 +265,89 @@ async function sbPatch(path, body) {
 // ═══ 系列管理 ═══
 async function loadSets() {
   sets = await sbGet('sets?order=code');
+  renderSetCfgTable();
   renderSetList();
 }
 
 
+function renderSetCfgTable() {
+  const body = document.getElementById('setCfgBody');
+  if (!sets.length) {
+    body.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">暂无系列，点击「新增」添加</td></tr>';
+    return;
+  }
+  body.innerHTML = sets.map(s => `
+    <tr>
+      <td><span class="code-badge">${esc(s.code)}</span></td>
+      <td><input type="text" value="${esc(s.name)}" onblur="saveSetName('${esc(s.code)}', this.value)" /></td>
+      <td style="width:48px;text-align:right">
+        <button class="btn btn-sm btn-ghost" style="color:var(--danger);border-color:var(--danger)" onclick="deleteSet('${esc(s.code)}')">删</button>
+      </td>
+    </tr>`).join('');
+}
+
 function renderSetList() {
   const wrap = document.getElementById('setList');
   if (!sets.length) { wrap.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:4px">暂无系列</div>'; return; }
-  wrap.innerHTML = sets.map(s => {
-    const ready = !!s.code;
-    return `<label class="set-item">
-      <input type="checkbox" class="set-cb" value="${esc(s.code)}" ${ready ? 'checked' : ''} ${ready ? '' : 'disabled'} />
+  wrap.innerHTML = sets.map(s => `
+    <label class="set-item">
+      <input type="checkbox" class="set-cb" value="${esc(s.code)}" checked />
       <span class="set-item-code">${esc(s.code)}</span>
       <span class="set-item-name">${esc(s.name)}</span>
-      <span class="${ready ? 'set-item-count' : 'set-item-count'}" style="color:${ready ? 'var(--success)' : 'var(--warn)'}">
-        ${ready ? s.code : '⚠ 待配置'}
-      </span>
-    </label>`;
-  }).join('');
+    </label>`).join('');
   updateStartBtn();
 }
 
+
+// ─── 系列 CRUD ───
+function openAddSet() {
+  document.getElementById('newSetCode').value = '';
+  document.getElementById('newSetName').value = '';
+  document.getElementById('addSetOverlay').style.display = 'flex';
+  document.getElementById('newSetCode').focus();
+}
+function closeAddSet() {
+  document.getElementById('addSetOverlay').style.display = 'none';
+}
+async function saveNewSet() {
+  const code = document.getElementById('newSetCode').value.trim().toUpperCase();
+  const name = document.getElementById('newSetName').value.trim();
+  if (!code || !name) { toast('代码和名称均必填'); return; }
+  if (sets.find(s => s.code === code)) { toast('系列代码 ' + code + ' 已存在'); return; }
+  try {
+    const r = await fetch(SB_URL + '/rest/v1/sets', {
+      method: 'POST',
+      headers: { ...SB_HDR(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ code, name })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    closeAddSet();
+    await loadSets();
+    toast('已添加系列：' + code + ' · ' + name);
+  } catch(e) { toast('保存失败：' + e.message); }
+}
+async function saveSetName(code, newName) {
+  const name = newName.trim();
+  const s = sets.find(x => x.code === code);
+  if (!name || (s && s.name === name)) return;
+  try {
+    await sbPatch('sets?code=eq.' + encodeURIComponent(code), { name });
+    if (s) s.name = name;
+    toast(code + ' 名称已更新');
+  } catch(e) { toast('保存失败：' + e.message); }
+}
+async function deleteSet(code) {
+  if (!confirm('确认删除系列「' + code + '」？')) return;
+  try {
+    const r = await fetch(SB_URL + '/rest/v1/sets?code=eq.' + encodeURIComponent(code), {
+      method: 'DELETE',
+      headers: SB_HDR()
+    });
+    if (!r.ok) throw new Error(await r.text());
+    await loadSets();
+    toast('已删除：' + code);
+  } catch(e) { toast('删除失败：' + e.message); }
+}
 
 // ═══ 爬取 ═══
 function checkAll()   { document.querySelectorAll('.set-cb:not(:disabled)').forEach(c => c.checked = true); }
