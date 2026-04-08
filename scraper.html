@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Riftbound · 卡牌爬取工具</title>
-<!-- v=3ac8ede -->
+<!-- v=489d22c -->
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0e0f13;--surface:#16181f;--surface2:#1c1f28;--border:#2a2d3a;--border2:#222535;--text:#d0d4e0;--mid:#8890a8;--muted:#4a5068;--gold:#c9a84c;--accent:#5b8dee;--success:#3ecf8e;--warn:#e8a93a;--danger:#e05c5c;--mono:'Courier New',monospace;--sans:'Noto Sans SC',sans-serif;--display:'Cinzel',serif}
@@ -456,9 +456,11 @@ function stopScrape() {
 function mapCard(c, setCode) {
   const card_type = CATEGORY_MAP[c.cardCategory] || c.cardCategory || 'unknown';
   const domains   = (c.cardColorList || []).map(col => COLOR_MAP[col] || col).filter(Boolean);
-  // card_number 只存纯数字（主站显示时会拼 set_code + '-' + card_number）
-  const _parsed = parseCardNo(c.cardNo);
-  const card_number = _parsed ? parseInt(_parsed.num, 10) : null;
+  // 编号：官网格式 "UNL·001"，转成 "UNL-001"
+  // 统一编号格式：SFD·001/221 或 UNL-001/219 → SFD-001
+  // 输出完整编号如 UNL-219（主站导入时会拆分，只保留数字部分）
+  const _p = parseCardNo(c.cardNo);
+  const card_number = _p ? _p.prefix + '-' + _p.num : (c.cardNo || '').replace('·', '-').split('/')[0];
   return {
     name:        c.cardName,
     img:         c.frontImage || '',

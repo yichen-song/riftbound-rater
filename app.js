@@ -926,7 +926,17 @@ async function doJsonImport() {
       const card = {
         id: uid(), name: cardName, img: item.img || '', pos: allCards.length + added,
         set_code:    item.set_code    || '',
-        card_number: item.card_number ?? null,
+        card_number: (() => {
+          // 支持两种格式：
+          // "UNL-219"：字母前缀须与 set_code 一致，只取数字部分
+          // 纯数字 219：直接使用
+          const raw = item.card_number;
+          if (raw == null) return null;
+          const m = String(raw).match(/^([A-Z]+)-(\d+)$/);
+          if (m) return m[1] === (item.set_code || '').trim() ? parseInt(m[2], 10) : null;
+          const n = parseInt(raw, 10);
+          return isNaN(n) ? null : n;
+        })(),
         card_type:   item.card_type   || '',
         domains:     Array.isArray(item.domains) ? item.domains : [],
       };
