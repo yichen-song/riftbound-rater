@@ -286,6 +286,8 @@ async function doLogin() {
     showMainScreen();
     setSyncState('syncing', '连接中…');
     showSkeleton();
+    // 确保自己的 profile 行存在（新用户首次登录时创建）
+    sbUpsert('profiles', { id: currentUser.id, display_name: currentUser.display_name }).catch(() => {});
     await loadAll();
     subscribeRealtime();
   } catch(e) {
@@ -318,6 +320,32 @@ async function doLogout() {
   showAuthScreen();
   document.getElementById('authPassword').value = '';
   document.getElementById('authErr').textContent = '';
+}
+
+// ── 修改昵称（点击右上角用户名触发）────────────────────────────
+async function editDisplayName() {
+  const current = currentUser.display_name;
+  const next = prompt('修改昵称：', current);
+  if (!next || next.trim() === current) return;
+  const name = next.trim();
+  try {
+    await sbUpsert('profiles', { id: currentUser.id, display_name: name });
+    currentUser.display_name = name;
+    document.getElementById('userPillName').textContent = name;
+    const self = allUsers.find(u => u.id === currentUser.id);
+    if (self) self.display_name = name;
+    // 同步更新 localStorage
+    try {
+      const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
+      if (saved.user) {
+        saved.user.user_metadata = { ...saved.user.user_metadata, display_name: name };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(saved));
+      }
+    } catch {}
+    toast('昵称已更新：' + name);
+  } catch(e) {
+    toast('修改失败：' + e.message);
+  }
 }
 
 function applySession(data) {
@@ -403,17 +431,18 @@ async function boot() {
 async function loadAll() {
   setSyncState('syncing', '加载中…');
   try {
-    const [cardRows, gradeRows, noteRows, setRows] = await Promise.all([
+    const [cardRows, gradeRows, noteRows, setRows, profileRows] = await Promise.all([
       sbFetch('cards?select=*&order=pos'),
       sbFetch('card_grades?select=*'),
       sbFetch('card_notes?select=*'),
       sbFetch('sets?select=*'),
+      sbFetch('profiles?select=*'),
     ]);
-    applyCards(cardRows   || []);
-    applySets(setRows     || []);
-    applyGrades(gradeRows || []);
-    applyNotes(noteRows   || []);
-    collectUsers(gradeRows || [], noteRows || []);
+    applyCards(cardRows     || []);
+    applySets(setRows       || []);
+    applyGrades(gradeRows   || []);
+    applyNotes(noteRows     || []);
+    collectUsers(gradeRows || [], noteRows || [], profileRows || []);
     setSyncState('live', '已同步');
   } catch(e) {
     console.error('load error', e);
@@ -461,19 +490,28 @@ function applyNotes(rows) {
   }
 }
 
-// 从评级/备注数据中收集已知用户（display_name 在第三步多人评级时补全）
-function collectUsers(gradeRows, noteRows) {
-  const seen = new Set(allUsers.map(u => u.id));
-  for (const r of [...gradeRows, ...noteRows]) {
-    if (!seen.has(r.user_id)) {
-      seen.add(r.user_id);
-      allUsers.push({ id: r.user_id, display_name: r.user_id.slice(0, 6) });
-    }
+// 从 profiles 表和评级/备注数据中建立用户列表
+function collectUsers(gradeRows, noteRows, profileRows) {
+  // 先建 profiles 查找表 { user_id: display_name }
+  const profileMap = {};
+  for (const p of profileRows) profileMap[p.id] = p.display_name;
+
+  // 收集所有出现过的 user_id
+  const seen = new Set();
+  for (const r of [...gradeRows, ...noteRows]) seen.add(r.user_id);
+  // 自己也要在列表里
+  seen.add(currentUser.id);
+
+  allUsers = [...seen].map(id => ({
+    id,
+    display_name: profileMap[id] || (id === currentUser.id ? currentUser.display_name : id.slice(0, 6)),
+  }));
+
+  // 用 profiles 里的名字更新 currentUser.display_name（以数据库为准）
+  if (profileMap[currentUser.id]) {
+    currentUser.display_name = profileMap[currentUser.id];
+    document.getElementById('userPillName').textContent = currentUser.display_name;
   }
-  // 确保自己在列表中且 display_name 正确
-  const self = allUsers.find(u => u.id === currentUser.id);
-  if (self) self.display_name = currentUser.display_name;
-  else allUsers.push({ id: currentUser.id, display_name: currentUser.display_name });
 }
 
 // ── 快捷访问器 ────────────────────────────────────────────────
