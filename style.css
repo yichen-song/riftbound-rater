@@ -243,7 +243,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:11px;padding:5px 7px;
   resize:none;outline:none;line-height:1.5;transition:border-color .2s;user-select:text;margin-bottom:5px;}
 .comment-box:focus{border-color:var(--gold-dark);}
-.comment-box::placeholder{color:color-mix(in srgb,var(--gold-dark) 60%,transparent);}
 .comment-box:read-only{opacity:.55;cursor:default;}
 
 /* 使用心得 */
@@ -251,7 +250,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   color:var(--text);font-family:'Noto Sans SC',sans-serif;font-size:11px;padding:5px 7px;
   resize:none;outline:none;line-height:1.5;transition:border-color .2s;user-select:text;}
 .note-box:focus{border-color:var(--border-hi);}
-.note-box::placeholder{color:var(--text-dim);}
 .note-box:read-only{opacity:.55;cursor:default;}
 
 /* 输入区小标签 */
@@ -314,6 +312,21 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .import-result{margin-top:10px;font-size:12px;padding:8px 10px;border-radius:4px;
   background:rgba(30,132,73,.12);border:1px solid rgba(30,132,73,.3);color:#7ecba1;display:none;}
 .import-result.err{background:rgba(192,57,43,.12);border-color:rgba(192,57,43,.3);color:#d07070;}
+
+/* ── Sets table ── */
+.sets-table{width:100%;border-collapse:collapse;font-size:13px;}
+.sets-table th{text-align:left;color:var(--text-dim);font-weight:500;font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;padding:4px 8px 8px;
+  border-bottom:1px solid var(--border);}
+.sets-table td{padding:5px 6px;border-bottom:1px solid rgba(37,43,56,.5);}
+.sets-table tbody tr:last-child td{border-bottom:none;}
+.sets-table tbody tr:hover td{background:rgba(255,255,255,.02);}
+.sets-code-input,.sets-name-input{background:var(--bg-input);border:1px solid var(--border);
+  border-radius:4px;color:var(--text);font-family:'Noto Sans SC',sans-serif;
+  font-size:12px;padding:4px 8px;width:100%;outline:none;transition:border-color .2s;}
+.sets-code-input{text-transform:uppercase;font-family:monospace;font-size:13px;letter-spacing:.05em;}
+.sets-code-input:focus,.sets-name-input:focus{border-color:var(--gold-dark);}
+.sets-empty{text-align:center;padding:20px 0;color:var(--text-dim);font-size:12px;}
 
 /* ── Toast ── */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--bg-panel);

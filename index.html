@@ -56,6 +56,7 @@
         onclick="editDisplayName()" title="点击修改昵称" style="cursor:pointer">—</span>
       <button class="btn btn-ghost btn-sm" onclick="doLogout()">退出</button>
     </div>
+    <button class="btn btn-ghost btn-sm" onclick="openSets()">⚙ 系列</button>
     <button class="btn btn-ghost btn-sm" onclick="openImport()">导入卡牌</button>
     <button class="btn btn-ghost btn-sm" onclick="openCompare()">⚖ 对比</button>
     <button class="btn btn-danger btn-sm" onclick="clearTab()">清空此页</button>
@@ -124,6 +125,21 @@
 
 </div><!-- /main-screen -->
 </div><!-- /app -->
+
+<!-- ── Sets Modal ── -->
+<div class="overlay" id="setsOv">
+  <div class="modal">
+    <div class="modal-title">⚙ 系列管理</div>
+    <div class="hint" style="margin-bottom:14px">
+      维护系列代码与全名对照。代码为大写缩写（如 <b>UNL</b>），全名为中文显示名（如 <b>破限</b>）。
+    </div>
+    <div id="setsTableWrap"><!-- 由 renderSetsTable() 填充 --></div>
+    <div class="m-btns" style="margin-top:10px">
+      <button class="btn btn-ghost" onclick="closeSets()">关闭</button>
+      <button class="btn btn-gold"  onclick="addSetRow()">+ 新增系列</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Import Modal ── -->
 <div class="overlay" id="importOv">
