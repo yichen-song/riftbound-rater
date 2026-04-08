@@ -396,8 +396,18 @@ async function refreshSession(refreshToken) {
     });
     if (!r.ok) { clearSession(); return false; }
     const data = await r.json();
+
+    // applySession 从 JWT user_metadata 读 display_name，管理员建的账号该字段为空，
+    // 会被回退成邮箱前缀。先记住已知的正确昵称，续期后补回去。
+    const knownName = currentUser?.display_name || null;
     applySession(data);
+    if (knownName && !data.user?.user_metadata?.display_name) {
+      currentUser.display_name = knownName;
+      // 同步写入 localStorage，下次刷新页面也能读到正确昵称
+      data.user.user_metadata = { ...data.user.user_metadata, display_name: knownName };
+    }
     saveSession(data);
+
     const delay = ((data.expires_in ?? 3600) - 120) * 1000;
     if (delay > 0) setTimeout(() => refreshSession(currentUser?.refresh_token), delay);
     return true;
@@ -511,6 +521,14 @@ function collectUsers(gradeRows, noteRows, profileRows) {
   if (profileMap[currentUser.id]) {
     currentUser.display_name = profileMap[currentUser.id];
     document.getElementById('userPillName').textContent = currentUser.display_name;
+    // 同步回 localStorage，避免下次刷新时 applySession 从 JWT user_metadata 读到旧的邮箱前缀
+    try {
+      const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
+      if (saved.user) {
+        saved.user.user_metadata = { ...saved.user.user_metadata, display_name: profileMap[currentUser.id] };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(saved));
+      }
+    } catch {}
   }
 }
 
