@@ -231,7 +231,7 @@ const SFC_HEAD={'Content-Type':'application/x-www-form-urlencoded','Client-Versi
 const TYPE_MAP={'单位':'unit','法术':'spell','圣物':'relic','传奇':'legend','战场':'battlefield','符文':'rune'};
 
 let sets=[],results=[],sfcToken='',stopFlag=false;
-const SB_HDR=()=>({'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY});
+function SB_HDR(){'use strict';return{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};}
 
 // ═══ 初始化 ═══
 
