@@ -378,9 +378,13 @@ async function restoreSession() {
   let saved;
   try { saved = JSON.parse(localStorage.getItem(SESSION_KEY)); } catch {}
   if (!saved?.access_token) return false;
-  const expiresAt = saved.expires_at ?? (Date.now() + (saved.expires_in ?? 3600) * 1000);
-  if (Date.now() < expiresAt - 60_000) {
-    applySession({ ...saved, expires_in: Math.floor((expiresAt - Date.now()) / 1000) });
+
+  // expires_at 不存在说明是旧格式 session（部署前存的，不含时间戳）
+  // 不能用 fallback 猜测，必须强制 refresh，否则过期 token 会被误判为有效
+  if (!saved.expires_at) return await refreshSession(saved.refresh_token);
+
+  if (Date.now() < saved.expires_at - 60_000) {
+    applySession({ ...saved, expires_in: Math.floor((saved.expires_at - Date.now()) / 1000) });
     return true;
   }
   return await refreshSession(saved.refresh_token);
