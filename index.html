@@ -56,6 +56,7 @@
         onclick="editDisplayName()" title="点击修改昵称" style="cursor:pointer">—</span>
       <button class="btn btn-ghost btn-sm" onclick="doLogout()">退出</button>
     </div>
+    <button class="btn btn-ghost btn-sm" onclick="openStats()">📊 统计</button>
     <button class="btn btn-ghost btn-sm" onclick="openSets()">⚙ 系列</button>
     <button class="btn btn-ghost btn-sm" onclick="openImport()">导入卡牌</button>
     <button class="btn btn-ghost btn-sm" onclick="openCompare()">⚖ 对比</button>
@@ -205,13 +206,72 @@
   </div>
 </div>
 
+
+<!-- ── Stats Modal ── -->
+<div class="overlay" id="statsOv">
+  <div class="modal modal-wide">
+    <div class="modal-title">📊 评级统计</div>
+    <div class="stats-format-row">
+      <span class="hc-label">赛制</span>
+      <div class="format-toggle">
+        <button class="fmt-btn active" id="stFmtC" onclick="switchStatsFormat('constructed')">构筑</button>
+        <button class="fmt-btn"        id="stFmtL" onclick="switchStatsFormat('limited')">限制</button>
+      </div>
+    </div>
+    <div id="statsContent"><!-- 由 renderStatsModal() 填充 --></div>
+    <div class="m-btns" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeStats()">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Lightbox ── -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
   <div class="lb-inner" id="lbInner">
     <button class="lb-close" onclick="closeLightbox()">×</button>
     <div id="lbContent"></div>
-    <div class="lb-name"   id="lbName"></div>
-    <div class="lb-meta"   id="lbMeta"></div>
+    <div class="lb-name" id="lbName"></div>
+    <div class="lb-meta" id="lbMeta"></div>
+    <!-- 卡牌详情编辑（点击展开） -->
+    <div class="lb-edit-wrap" id="lbEditWrap">
+      <button class="lb-edit-toggle" onclick="toggleLbEdit()">✏ 编辑详情</button>
+      <div class="lb-edit-panel" id="lbEditPanel" style="display:none">
+        <div class="lb-edit-row">
+          <label>系列</label>
+          <select id="lbSetCode" onchange="lbSaveField('set_code',this.value)">
+            <option value="">— 无 —</option>
+          </select>
+        </div>
+        <div class="lb-edit-row">
+          <label>编号</label>
+          <input type="number" id="lbCardNumber" min="1"
+            onblur="lbSaveField('card_number', this.value === '' ? null : parseInt(this.value))" />
+        </div>
+        <div class="lb-edit-row">
+          <label>类型</label>
+          <select id="lbCardType" onchange="lbSaveCardType(this.value)">
+            <option value="">— 未设置 —</option>
+            <option value="legend">Legend · 传奇</option>
+            <option value="battlefield">Battlefield · 战场</option>
+            <option value="unit">Unit · 单位</option>
+            <option value="gear">Gear · 装备</option>
+            <option value="spell">Spell · 法术</option>
+            <option value="rune">Rune · 符文</option>
+          </select>
+        </div>
+        <div class="lb-edit-row lb-edit-domains" id="lbDomainsRow">
+          <label>特性</label>
+          <div class="domain-checks domain-checks-sm" id="lbDomains">
+            <label><input type="checkbox" value="炽烈" onchange="lbSaveDomains()"><span style="color:#e05252">炽烈</span></label>
+            <label><input type="checkbox" value="翠意" onchange="lbSaveDomains()"><span style="color:#52b96e">翠意</span></label>
+            <label><input type="checkbox" value="灵光" onchange="lbSaveDomains()"><span style="color:#5b9fe0">灵光</span></label>
+            <label><input type="checkbox" value="摧破" onchange="lbSaveDomains()"><span style="color:#e07d30">摧破</span></label>
+            <label><input type="checkbox" value="混沌" onchange="lbSaveDomains()"><span style="color:#9b6de0">混沌</span></label>
+            <label><input type="checkbox" value="序理" onchange="lbSaveDomains()"><span style="color:#d4b935">序理</span></label>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

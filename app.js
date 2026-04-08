@@ -1307,6 +1307,7 @@ document.getElementById('inName').addEventListener('keydown', e => { if (e.key =
 document.getElementById('importOv').addEventListener('click', e => { if (e.target === e.currentTarget) closeImport(); });
 document.getElementById('cmpOv').addEventListener('click',   e => { if (e.target === e.currentTarget) closeCmp(); });
 document.getElementById('setsOv').addEventListener('click',  e => { if (e.target === e.currentTarget) closeSets(); });
+document.getElementById('statsOv').addEventListener('click', e => { if (e.target === e.currentTarget) closeStats(); });
 
 // S/A/B/C/D/E → 评级聚焦卡 | Escape → 取消 | ← → → 导航
 document.addEventListener('keydown', e => {
@@ -1358,10 +1359,15 @@ document.getElementById('cardGrid').addEventListener('click', e => {
 });
 
 // ── Lightbox ──────────────────────────────────────────────────
+// 当前 lightbox 正在展示的卡牌 id
+let lbCardId = null;
+
 function openLightbox(evt, id) {
   evt.stopPropagation();
   const c = findCard(id);
   if (!c) return;
+  lbCardId = id;
+
   const content = document.getElementById('lbContent');
   if (c.img) {
     content.innerHTML = `<img class="lb-img" src="${c.img}" alt="${c.name}"
@@ -1370,8 +1376,20 @@ function openLightbox(evt, id) {
   } else {
     content.innerHTML = `<div class="lb-ph"><div class="lb-ph-ico">🃏</div></div>`;
   }
+
   document.getElementById('lbName').textContent = c.name;
-  // 卡牌 meta 标签
+  refreshLbMeta(c);
+  populateLbEdit(c);
+
+  // 收起编辑面板（每次重新打开时重置）
+  document.getElementById('lbEditPanel').style.display = 'none';
+  document.getElementById('lbEditToggle') && (document.querySelector('.lb-edit-toggle').textContent = '✏ 编辑详情');
+
+  document.getElementById('lightbox').classList.add('open');
+}
+
+// 刷新 lightbox meta 标签（编辑保存后调用）
+function refreshLbMeta(c) {
   const setName = c.set_code ? (sets[c.set_code] ? `${sets[c.set_code]}（${c.set_code}）` : c.set_code) : '';
   const numTag  = (c.set_code && c.card_number != null)
     ? `<span class="ci-tag card-num">${c.set_code}-${c.card_number}</span>` : '';
@@ -1380,12 +1398,219 @@ function openLightbox(evt, id) {
     `<span class="ci-tag domain" style="--dt:${DOMAIN_COLOR[d] || 'var(--text-dim)'}">${d}</span>`
   ).join('');
   document.getElementById('lbMeta').innerHTML = numTag + setTag + domTags;
-  document.getElementById('lightbox').classList.add('open');
+}
+
+// 填充编辑面板的表单值
+function populateLbEdit(c) {
+  // 系列下拉：动态填充当前 sets 表
+  const setSelect = document.getElementById('lbSetCode');
+  setSelect.innerHTML = '<option value="">— 无 —</option>' +
+    Object.entries(sets).sort().map(([code, name]) =>
+      `<option value="${code}" ${c.set_code === code ? 'selected' : ''}>${code} · ${name}</option>`
+    ).join('');
+
+  // 编号
+  const numInput = document.getElementById('lbCardNumber');
+  numInput.value = c.card_number != null ? c.card_number : '';
+
+  // 类型
+  document.getElementById('lbCardType').value = c.card_type || '';
+
+  // 特性 checkbox
+  const domainCbs = document.querySelectorAll('#lbDomains input[type=checkbox]');
+  domainCbs.forEach(cb => { cb.checked = (c.domains || []).includes(cb.value); });
+
+  // 特性行显隐：legend/battlefield 隐藏
+  const hideD = c.card_type === 'legend' || c.card_type === 'battlefield';
+  document.getElementById('lbDomainsRow').style.display = hideD ? 'none' : '';
 }
 
 function closeLightbox(evt) {
   if (evt && evt.target !== evt.currentTarget && !evt.target.classList.contains('lb-close')) return;
   document.getElementById('lightbox').classList.remove('open');
+  lbCardId = null;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LIGHTBOX CARD EDIT
+// ═══════════════════════════════════════════════════════════
+function toggleLbEdit() {
+  const panel  = document.getElementById('lbEditPanel');
+  const btn    = document.querySelector('.lb-edit-toggle');
+  const hidden = panel.style.display === 'none';
+  panel.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? '▲ 收起详情' : '✏ 编辑详情';
+}
+
+// 保存单个字段（set_code / card_number）
+async function lbSaveField(field, value) {
+  const c = findCard(lbCardId);
+  if (!c) return;
+  c[field] = value;
+  refreshLbMeta(c);
+  renderAll();
+  await saveCardMeta(c);
+}
+
+// 类型变更：同步更新特性行显隐
+async function lbSaveCardType(value) {
+  const c = findCard(lbCardId);
+  if (!c) return;
+  c.card_type = value;
+  // legend/battlefield 强制清空 domains
+  if (value === 'legend' || value === 'battlefield') {
+    c.domains = [];
+    document.querySelectorAll('#lbDomains input[type=checkbox]').forEach(cb => cb.checked = false);
+  }
+  document.getElementById('lbDomainsRow').style.display =
+    (value === 'legend' || value === 'battlefield') ? 'none' : '';
+  refreshLbMeta(c);
+  renderAll();
+  await saveCardMeta(c);
+}
+
+// 特性多选变更
+async function lbSaveDomains() {
+  const c = findCard(lbCardId);
+  if (!c) return;
+  c.domains = Array.from(document.querySelectorAll('#lbDomains input[type=checkbox]:checked'))
+    .map(cb => cb.value);
+  refreshLbMeta(c);
+  renderAll();
+  await saveCardMeta(c);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STATS MODAL
+// ═══════════════════════════════════════════════════════════
+let statsFormat = 'constructed';
+
+function openStats() {
+  statsFormat = activeFormat;
+  document.getElementById('stFmtC').classList.toggle('active', statsFormat === 'constructed');
+  document.getElementById('stFmtL').classList.toggle('active', statsFormat === 'limited');
+  renderStatsModal();
+  document.getElementById('statsOv').classList.add('open');
+}
+
+function closeStats() {
+  document.getElementById('statsOv').classList.remove('open');
+}
+
+function switchStatsFormat(fmt) {
+  statsFormat = fmt;
+  document.getElementById('stFmtC').classList.toggle('active', fmt === 'constructed');
+  document.getElementById('stFmtL').classList.toggle('active', fmt === 'limited');
+  renderStatsModal();
+}
+
+function renderStatsModal() {
+  const el = document.getElementById('statsContent');
+  const fmt = statsFormat;
+
+  // 有该赛制评级的用户
+  const users = allUsers.filter(u =>
+    allCards.some(c => grades[c.id]?.[u.id]?.[fmt]?.grade)
+  );
+
+  if (!users.length) {
+    el.innerHTML = `<div class="stats-empty">暂无「${fmt === 'constructed' ? '构筑' : '限制'}赛」评级数据</div>`;
+    return;
+  }
+
+  let html = '';
+
+  // ── 区块一：当前 Tab 评级分布（横向堆叠条形图） ──
+  const tabCards = getCardsForTab(activeTab, allCards);
+  const tabLabel = TABS.find(t => t.id === activeTab)?.label || activeTab;
+
+  if (tabCards.length) {
+    // 每位用户在当前 tab 的各档位数量
+    const userStats = users.map(u => {
+      const counts = {};
+      G.forEach(g => { counts[g] = tabCards.filter(c => grades[c.id]?.[u.id]?.[fmt]?.grade === g).length; });
+      counts.total = tabCards.filter(c => grades[c.id]?.[u.id]?.[fmt]?.grade).length;
+      return { ...u, counts };
+    });
+
+    const maxTotal = Math.max(...userStats.map(u => u.counts.total), 1);
+
+    // 用户图例
+    const USER_COLORS = ['#5b9fe0','#e07d30','#52b96e','#9b6de0','#d4b935','#e05252'];
+    const legendHtml = users.map((u, i) =>
+      `<div class="stats-legend-item">
+        <div class="stats-legend-dot" style="background:${USER_COLORS[i % USER_COLORS.length]}"></div>
+        ${u.display_name}
+      </div>`
+    ).join('');
+
+    // 每档位一行，每行各用户的条形
+    const gridCols = `60px repeat(${users.length}, 1fr)`;
+    const barsHtml = G.map(g => {
+      const bars = userStats.map((u, i) => {
+        const n = u.counts[g];
+        const pct = u.counts.total > 0 ? Math.round(n / u.counts.total * 100) : 0;
+        const color = USER_COLORS[i % USER_COLORS.length];
+        const barPct = maxTotal > 0 ? Math.round(n / maxTotal * 100) : 0;
+        const showInside = barPct >= 20;
+        return `<div style="position:relative;height:20px;background:var(--border);border-radius:3px;overflow:visible;">
+          <div class="stats-bar" style="width:${barPct}%;background:${GC[g]};opacity:${0.55 + i * 0.15};min-width:${n > 0 ? 4 : 0}px;">
+            ${showInside && n > 0 ? `<span class="stats-bar-val">${n}</span>` : ''}
+          </div>
+          ${!showInside && n > 0 ? `<span class="stats-bar-val outside">${n}</span>` : ''}
+        </div>`;
+      }).join('');
+      return `<div class="stats-row" style="grid-template-columns:${gridCols}">
+        <div style="display:flex;align-items:center;gap:5px;">
+          <div style="width:22px;height:22px;border-radius:3px;background:${GC[g]};color:${GF[g]};
+            display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:11px;font-weight:700;">${g}</div>
+        </div>
+        ${bars}
+      </div>`;
+    }).join('');
+
+    html += `<div class="stats-section">
+      <div class="stats-section-title">${tabLabel} · 档位分布（${fmt === 'constructed' ? '构筑' : '限制'}赛）</div>
+      <div class="stats-chart">${barsHtml}</div>
+      <div class="stats-legend">${legendHtml}</div>
+    </div>`;
+  }
+
+  // ── 区块二：全局 Tab 概览表格 ──
+  const overviewRows = TABS.map(tab => {
+    const tc = getCardsForTab(tab.id, allCards);
+    if (!tc.length) return '';
+    // 每位用户各档位数
+    const cells = users.map(u => {
+      const counts = G.map(g => {
+        const n = tc.filter(c => grades[c.id]?.[u.id]?.[fmt]?.grade === g).length;
+        return n > 0
+          ? `<div class="stats-ov-badge" style="background:${GC[g]};color:${GF[g]}">${n}</div>`
+          : `<div class="stats-ov-badge" style="background:var(--bg-input);color:var(--text-dim);opacity:.4">·</div>`;
+      }).join('');
+      const rated = tc.filter(c => grades[c.id]?.[u.id]?.[fmt]?.grade).length;
+      return `<td>
+        <div class="stats-ov-grades">${counts}</div>
+        <div class="stats-ov-total">${rated}/${tc.length}</div>
+      </td>`;
+    }).join('');
+
+    return `<tr>
+      <td class="stats-ov-tab" style="color:${tab.color}">${tab.label}</td>
+      ${cells}
+    </tr>`;
+  }).filter(Boolean).join('');
+
+  const headerCells = users.map(u => `<th>${u.display_name}</th>`).join('');
+  html += `<div class="stats-section">
+    <div class="stats-section-title">全局 Tab 概览</div>
+    <table class="stats-overview">
+      <thead><tr><th>Tab</th>${headerCells}</tr></thead>
+      <tbody>${overviewRows}</tbody>
+    </table>
+  </div>`;
+
+  el.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════
