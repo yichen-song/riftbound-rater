@@ -4,12 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Riftbound · 卡牌爬取工具</title>
-<!-- v=dev -->
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0e0f13;--surface:#16181f;--surface2:#1c1f28;--border:#2a2d3a;--border2:#222535;--text:#d0d4e0;--mid:#8890a8;--muted:#4a5068;--gold:#c9a84c;--accent:#5b8dee;--success:#3ecf8e;--warn:#e8a93a;--danger:#e05c5c;--mono:'Courier New',monospace;--sans:'Noto Sans SC',sans-serif;--display:'Cinzel',serif}
 *{box-sizing:border-box;margin:0;padding:0}html,body{height:100%}
 body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.6}
+
+/* ─── Header ─── */
 header{display:flex;align-items:center;gap:16px;padding:0 24px;height:52px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10}
 .logo{font-family:var(--display);font-size:15px;letter-spacing:.12em;color:var(--gold)}
 .logo small{display:block;font-size:8px;letter-spacing:.2em;color:var(--muted);font-family:var(--sans);margin-top:-2px}
@@ -19,53 +20,99 @@ header{display:flex;align-items:center;gap:16px;padding:0 24px;height:52px;borde
 .sync-dot.ok{background:var(--success);box-shadow:0 0 5px var(--success)}.sync-dot.err{background:var(--danger)}
 .sync-dot.spin{background:var(--warn);animation:blink 1s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-.layout{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 52px)}
-.sidebar{border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;background:var(--surface)}
+
+/* ─── Layout ─── */
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 52px)}
+.sidebar{border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--surface);overflow-y:auto}
 .main-col{padding:24px;display:flex;flex-direction:column;gap:20px;overflow-y:auto}
+
+/* ─── Card panel ─── */
 .card{background:var(--surface);border:1px solid var(--border2);border-radius:8px;overflow:hidden}
 .card-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border2);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--mid)}
 .card-body{padding:14px}
+
+/* ─── Forms ─── */
 .field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.field:last-child{margin-bottom:0}
 .field label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-input[type=text],input[type=number],select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px;font-family:var(--sans);font-size:12px;outline:none;width:100%;transition:border-color .15s}
+input[type=text],select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px;font-family:var(--sans);font-size:12px;outline:none;width:100%;transition:border-color .15s}
 input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var(--muted)}
+
+/* ─── Buttons ─── */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;border-radius:5px;border:none;cursor:pointer;font-family:var(--sans);font-size:12px;font-weight:600;transition:opacity .15s,transform .1s;white-space:nowrap}
 .btn:hover{opacity:.85}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
 .btn-gold{background:var(--gold);color:#1a1200}.btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger)}
 .btn-sm{padding:4px 10px;font-size:11px}.btn-full{width:100%}
+
+/* ─── 系列选择列表（侧边栏）─── */
 .set-list{display:flex;flex-direction:column;gap:4px}
 .set-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border2);border-radius:5px;cursor:pointer;transition:border-color .15s,background .15s}
 .set-item:hover{border-color:var(--accent);background:var(--surface2)}
-.set-item input[type=checkbox]{accent-color:var(--gold);width:13px;height:13px;flex-shrink:0}
-.set-item-code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold);min-width:36px}
-.set-item-name{font-size:12px;color:var(--text);flex:1}
-.set-item-count{font-size:10px;color:var(--muted)}
-.sets-cfg-table{width:100%;border-collapse:collapse}
-.sets-cfg-table th,.sets-cfg-table td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--border2)}
-.sets-cfg-table th{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.sets-cfg-table td{font-size:12px}.sets-cfg-table tr:last-child td{border-bottom:none}
-.sets-cfg-table input{background:transparent;border:1px solid transparent;color:var(--text);padding:3px 7px;border-radius:4px;font-family:var(--sans);font-size:12px;width:100%;outline:none}
-.sets-cfg-table input:focus{border-color:var(--accent);background:var(--bg)}
-.sets-cfg-table input.saving{border-color:var(--warn)}.sets-cfg-table input.saved{border-color:var(--success)}
+.set-item input[type=checkbox]{accent-color:var(--gold);width:13px;height:13px;flex-shrink:0;cursor:pointer}
+.set-item-code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold);min-width:42px}
+.set-item-name{font-size:12px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ─── 系列管理表格 ─── */
+.sets-table{width:100%;border-collapse:collapse}
+.sets-table th,.sets-table td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--border2)}
+.sets-table th{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;background:var(--surface)}
+.sets-table td{font-size:12px}.sets-table tbody tr:last-child td{border-bottom:none}
+.sets-table tbody tr:hover td{background:var(--surface2)}
+.sets-table .edit-input{background:transparent;border:1px solid transparent;color:var(--text);padding:3px 6px;border-radius:4px;font-family:var(--sans);font-size:12px;width:100%;outline:none;transition:border-color .15s}
+.sets-table .edit-input:focus{border-color:var(--accent);background:var(--bg)}
+.sets-table .edit-input.dirty{border-color:var(--warn)}
+.sets-table .edit-input.saved{border-color:var(--success)}
+
+/* ─── Misc ─── */
 .code-badge{display:inline-block;padding:2px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);font-family:var(--mono);font-size:11px;font-weight:700;color:var(--gold)}
-.prog-wrap{margin:8px 0}.prog-track{background:var(--bg);border-radius:4px;overflow:hidden;height:5px}
-.prog-fill{height:100%;background:var(--gold);transition:width .3s;border-radius:4px}
-.prog-label{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px}
-.log-box{background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:10px 12px;height:200px;overflow-y:auto;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--muted)}
-.log-ok{color:var(--success)}.log-warn{color:var(--warn)}.log-err{color:var(--danger)}.log-info{color:var(--text)}
-.stat-row{display:flex;gap:10px;margin-bottom:12px}
-.stat-box{flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:10px 12px;text-align:center}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:var(--surface2);border:1px solid var(--border);color:var(--text);margin:1px 1px 1px 0}
+.tag-color{background:#12202e;border-color:#2a4060;color:#7ab8e8}
+.divider{height:1px;background:var(--border2);margin:2px 0}
+
+/* ─── 进度 ─── */
+.stat-row{display:flex;gap:8px;margin-bottom:12px}
+.stat-box{flex:1;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;text-align:center}
 .stat-num{font-size:20px;font-weight:700;color:var(--gold);line-height:1;font-family:var(--mono)}
 .stat-label{font-size:9px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
-.result-scroll{overflow-x:auto;max-height:400px;overflow-y:auto}
+.prog-wrap{margin:8px 0}
+.prog-track{background:var(--bg);border-radius:4px;overflow:hidden;height:5px}
+.prog-fill{height:100%;background:var(--gold);transition:width .3s;border-radius:4px;width:0%}
+.prog-label{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px}
+.log-box{background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:10px 12px;height:180px;overflow-y:auto;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--muted)}
+.log-ok{color:var(--success)}.log-warn{color:var(--warn)}.log-err{color:var(--danger)}.log-info{color:var(--text)}
+
+/* ─── 结果表格 ─── */
+.result-scroll{overflow-x:auto;max-height:420px;overflow-y:auto}
 .result-table{width:100%;border-collapse:collapse;font-size:11px}
 .result-table th{position:sticky;top:0;background:var(--surface);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.result-table td{padding:5px 10px;border-bottom:1px solid var(--border2)}
+.result-table td{padding:5px 10px;border-bottom:1px solid var(--border2);vertical-align:middle}
 .result-table tr:hover td{background:var(--surface2)}
-.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:var(--surface2);border:1px solid var(--border);color:var(--text);margin:1px 1px 1px 0}
-.tag-domain{background:#12202e;border-color:#2a4060;color:#7ab8e8}
+
+/* ─── 弹窗 ─── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px;width:340px;display:flex;flex-direction:column;gap:14px}
+.modal-title{font-size:14px;font-weight:600;color:var(--text)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+
+/* ─── 连字符配置标签 ─── */
+.sep-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.sep-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);font-family:var(--mono);font-size:12px;color:var(--text)}
+.sep-tag button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 1px}
+.sep-tag button:hover{color:var(--danger)}
+.sep-add-row{display:flex;gap:6px;margin-top:8px}
+.sep-add-row input{flex:1}
+
+/* ─── 未连接提示 ─── */
+.no-auth{display:flex;flex-direction:column;align-items:center;gap:12px;padding:40px 20px;text-align:center;color:var(--mid)}
+.no-auth-icon{font-size:32px}
+.no-auth p{font-size:12px;line-height:1.8;max-width:280px}
+.no-auth code{font-family:var(--mono);font-size:11px;color:var(--gold);background:var(--bg);padding:1px 5px;border-radius:3px}
+
+/* ─── Toast ─── */
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 18px;border-radius:20px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:999;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
 @media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid var(--border)}}
 </style>
 </head>
@@ -75,49 +122,74 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
   <div class="header-right">
     <div class="sync-pill">
       <div class="sync-dot" id="sbDot"></div>
-      <span id="sbLabel">连接中…</span>
+      <span id="sbLabel">初始化…</span>
     </div>
   </div>
 </header>
+
 <div class="layout">
+
+<!-- ═══ 侧边栏：系列选择 + 爬取控制 ═══ -->
 <aside class="sidebar">
 
-  <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
-    <div class="card-head">
-      选择系列
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-ghost" onclick="checkAll()">全选</button>
-        <button class="btn btn-sm btn-ghost" onclick="uncheckAll()">清空</button>
-      </div>
-    </div>
-    <div class="card-body" style="padding:10px;overflow-y:auto;flex:1">
-      <div class="set-list" id="setList">
-        <div style="color:var(--muted);font-size:11px;padding:6px">加载中…</div>
-      </div>
+  <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">选择系列</div>
+
+  <div style="display:flex;gap:6px">
+    <button class="btn btn-sm btn-ghost" style="flex:1" onclick="checkAll()">全选</button>
+    <button class="btn btn-sm btn-ghost" style="flex:1" onclick="uncheckAll()">清空</button>
+  </div>
+
+  <div class="set-list" id="setList" style="flex:1;overflow-y:auto;min-height:60px">
+    <div style="color:var(--muted);font-size:11px;padding:4px">加载中…</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 连字符配置 -->
+  <div>
+    <div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">编号分隔符</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:6px">格式：<span style="font-family:var(--mono);color:var(--gold)">XXX{sep}num/total</span></div>
+    <div class="sep-tags" id="sepTags"></div>
+    <div class="sep-add-row">
+      <input type="text" id="sepInput" placeholder="添加字符" maxlength="3" style="font-family:var(--mono)" />
+      <button class="btn btn-sm btn-ghost" onclick="addSep()">添加</button>
     </div>
   </div>
 
-  <div style="display:flex;flex-direction:column;gap:6px">
-    <button class="btn btn-gold btn-full" id="startBtn" onclick="startScrape()" disabled>&#9654; 开始爬取</button>
-    <button class="btn btn-ghost btn-full" id="stopBtn" onclick="stopScrape()" disabled>&#9632; 停止</button>
-  </div>
+  <div class="divider"></div>
+
+  <button class="btn btn-gold btn-full" id="startBtn" onclick="startScrape()" disabled>▶ 开始爬取</button>
+  <button class="btn btn-ghost btn-full" id="stopBtn" onclick="stopScrape()" disabled>■ 停止</button>
 
 </aside>
+
+<!-- ═══ 主区域 ═══ -->
 <main class="main-col">
 
+  <!-- 未登录提示（连接失败时显示）-->
+  <div id="noAuthPanel" style="display:none" class="card">
+    <div class="card-body">
+      <div class="no-auth">
+        <div class="no-auth-icon">🔒</div>
+        <p>无法读取 Supabase 配置。<br>请先在主站登录，然后刷新此页面。<br>此工具通过 <code>rb_sb_cfg</code> 读取连接信息。</p>
+        <button class="btn btn-gold" onclick="location.reload()">重新连接</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 系列管理 -->
-  <div class="card">
+  <div class="card" id="setsCard">
     <div class="card-head">
       系列管理
       <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-ghost" onclick="loadSets()">&#8635; 刷新</button>
-        <button class="btn btn-sm btn-gold" onclick="openAddSet()">&#43; 新增</button>
+        <button class="btn btn-sm btn-ghost" onclick="loadSets()">↻ 刷新</button>
+        <button class="btn btn-sm btn-gold" onclick="openAddSet()">+ 新增</button>
       </div>
     </div>
     <div class="card-body" style="padding:0">
-      <table class="sets-cfg-table">
+      <table class="sets-table">
         <thead>
-          <tr><th>代码</th><th>名称</th><th></th></tr>
+          <tr><th>代码</th><th>系列名称</th><th style="width:60px"></th></tr>
         </thead>
         <tbody id="setCfgBody">
           <tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">加载中…</td></tr>
@@ -126,59 +198,43 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
     </div>
   </div>
 
-  <!-- 新增系列弹窗 -->
-  <div id="addSetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;width:320px">
-      <div style="font-size:14px;font-weight:600;margin-bottom:14px">新增系列</div>
-      <div class="field">
-        <label>系列代码</label>
-        <input type="text" id="newSetCode" placeholder="如 UNL" style="text-transform:uppercase" />
-      </div>
-      <div class="field">
-        <label>系列名称</label>
-        <input type="text" id="newSetName" placeholder="如 破限" />
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-        <button class="btn btn-ghost" onclick="closeAddSet()">取消</button>
-        <button class="btn btn-gold" onclick="saveNewSet()">保存</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 进度 -->
+  <!-- 爬取进度（默认隐藏）-->
   <div class="card" id="progressCard" style="display:none">
     <div class="card-head">
       爬取进度
-      <span id="progressText" style="font-weight:400;font-size:11px;color:var(--text)">—</span>
+      <span id="progressText" style="font-weight:400;color:var(--text);font-size:11px">—</span>
     </div>
     <div class="card-body">
       <div class="stat-row">
-        <div class="stat-box"><div class="stat-num" id="sFetched">0</div><div class="stat-label">官网总卡数</div></div>
-        <div class="stat-box"><div class="stat-num" id="sValid">0</div><div class="stat-label">有效卡牌</div></div>
-        <div class="stat-box"><div class="stat-num" id="sSkipped">0</div><div class="stat-label">跳过（超编等）</div></div>
+        <div class="stat-box"><div class="stat-num" id="sFetched">0</div><div class="stat-label">官网总数</div></div>
+        <div class="stat-box"><div class="stat-num" id="sValid">0</div><div class="stat-label">有效收录</div></div>
+        <div class="stat-box"><div class="stat-num" id="sSkipped">0</div><div class="stat-label">跳过</div></div>
       </div>
       <div class="prog-wrap">
         <div class="prog-label"><span id="progSetLabel">—</span><span id="progPct">0%</span></div>
-        <div class="prog-track"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
       </div>
       <div class="log-box" id="logBox"></div>
     </div>
   </div>
 
-  <!-- 结果 -->
+  <!-- 爬取结果（默认隐藏）-->
   <div class="card" id="resultCard" style="display:none">
     <div class="card-head">
       爬取结果
       <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-ghost" onclick="exportJSON()">&#8595; 导出 JSON</button>
-        <button class="btn btn-sm btn-ghost" onclick="exportCSV()">&#8595; 导出 CSV</button>
+        <button class="btn btn-sm btn-ghost" onclick="exportJSON()">↓ JSON</button>
+        <button class="btn btn-sm btn-ghost" onclick="exportCSV()">↓ CSV</button>
       </div>
     </div>
     <div class="card-body" style="padding:0">
       <div class="result-scroll">
         <table class="result-table">
           <thead>
-            <tr><th>卡名</th><th>系列</th><th>编号</th><th>类型</th><th>颜色</th><th>稀有度</th></tr>
+            <tr>
+              <th>卡名</th><th>系列</th><th>编号</th><th>类型</th>
+              <th>颜色</th><th>费用</th><th>战力</th><th>稀有度</th>
+            </tr>
           </thead>
           <tbody id="resultBody"></tbody>
         </table>
@@ -187,31 +243,64 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
   </div>
 
 </main>
+</div><!-- /.layout -->
+
+<!-- ═══ 新增系列弹窗 ═══ -->
+<div class="overlay" id="addSetOverlay">
+  <div class="modal">
+    <div class="modal-title">新增系列</div>
+    <div class="field">
+      <label>系列代码</label>
+      <input type="text" id="newSetCode" placeholder="如 OGS" style="text-transform:uppercase;font-family:var(--mono)" />
+    </div>
+    <div class="field">
+      <label>系列名称</label>
+      <input type="text" id="newSetName" placeholder="如 起源系列" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeAddSet()">取消</button>
+      <button class="btn btn-gold" onclick="saveNewSet()">保存</button>
+    </div>
+  </div>
 </div>
+
 <div class="toast" id="toast"></div>
+
 <script>
 'use strict';
-// ═══ CONFIG（与主站 app.js 保持同步）═══
-const SB_URL = 'https://vepqjryrhvuehwemabqu.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlcHFqcnlyaHZ1ZWh3ZW1hYnF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjA2MjYsImV4cCI6MjA5MDQzNjYyNn0.8ZWqTUwEQX1zFwTCLx7eqwfocDmw5DId2rrxoxDjrPk';
-
-// ═══ 官网 API（无需认证）═══
+// ═══ 官网 API ═══
 const OFFICIAL_API = 'https://lol-api.playloltcg.com/xcx/card/searchCardCraftWeb';
 
+// ═══ 连字符默认集合（可在侧边栏动态增删）═══
+// 编号格式：XXX{sep}num/total，其中 num 和 total 均为纯整数
+// 当前已知：'-'（UNL-001/219）和 '·'（SFD·001/221）
+const DEFAULT_SEPS = ['-', '·'];
+
+let sbUrl = '', sbKey = '';
 let sets = [], results = [], stopFlag = false;
+let separators = [...DEFAULT_SEPS];
 
-// ═══ 初始化 ═══
-function SB_HDR() {
-  let token = SB_KEY;
-  try {
-    const s = JSON.parse(localStorage.getItem('rb_session') || '{}');
-    if (s.access_token) token = s.access_token;
-  } catch(e) {}
-  return { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + token };
-}
-
+// ═══ 初始化：从 localStorage 读取主站写入的 Supabase 配置 ═══
+// 主站登录成功后需将 { url, key } 写入 localStorage key: rb_sb_cfg
 (async function init() {
   setSbStatus('spin', '连接中…');
+  renderSepTags();
+
+  try {
+    const cfg = JSON.parse(localStorage.getItem('rb_sb_cfg') || 'null');
+    if (!cfg?.url || !cfg?.key) throw new Error('未找到 rb_sb_cfg');
+    sbUrl = cfg.url;
+    sbKey = cfg.key;
+  } catch(e) {
+    setSbStatus('err', '未找到配置');
+    document.getElementById('noAuthPanel').style.display = 'block';
+    document.getElementById('setsCard').style.display = 'none';
+    showLog();
+    log('err', '无法读取 Supabase 配置：' + e.message);
+    log('warn', '⚠ 请先登录主站（同一浏览器），再刷新此页');
+    return;
+  }
+
   try {
     await loadSets();
     setSbStatus('ok', '已连接');
@@ -219,26 +308,48 @@ function SB_HDR() {
     setSbStatus('err', '连接失败');
     showLog();
     log('err', 'Supabase 连接失败：' + e.message);
-    if (!JSON.parse(localStorage.getItem('rb_session') || '{}').access_token) {
-      log('warn', '⚠ 请先登录主站（同一浏览器），再刷新此页');
-    }
   }
   updateStartBtn();
 })();
 
-// ═══ Supabase ═══
+// ═══ Supabase 请求头（优先用登录 token，退回 anon key）═══
+function sbHdr(extra) {
+  let token = sbKey;
+  try {
+    const s = JSON.parse(localStorage.getItem('rb_session') || '{}');
+    if (s.access_token) token = s.access_token;
+  } catch(e) {}
+  return { 'apikey': sbKey, 'Authorization': 'Bearer ' + token, ...extra };
+}
+
+// ═══ Supabase REST 封装 ═══
 async function sbGet(path) {
-  const r = await fetch(SB_URL + '/rest/v1/' + path, { headers: SB_HDR() });
+  const r = await fetch(sbUrl + '/rest/v1/' + path, { headers: sbHdr() });
   if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + await r.text());
   const d = await r.json();
   if (!Array.isArray(d)) throw new Error('格式异常: ' + JSON.stringify(d).slice(0, 80));
   return d;
 }
-async function sbPatch(path, body) {
-  const r = await fetch(SB_URL + '/rest/v1/' + path, {
-    method: 'PATCH',
-    headers: { ...SB_HDR(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+async function sbPost(path, body) {
+  const r = await fetch(sbUrl + '/rest/v1/' + path, {
+    method: 'POST',
+    headers: sbHdr({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
     body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + await r.text());
+}
+async function sbPatch(path, body) {
+  const r = await fetch(sbUrl + '/rest/v1/' + path, {
+    method: 'PATCH',
+    headers: sbHdr({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + await r.text());
+}
+async function sbDelete(path) {
+  const r = await fetch(sbUrl + '/rest/v1/' + path, {
+    method: 'DELETE',
+    headers: sbHdr()
   });
   if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + await r.text());
 }
@@ -259,108 +370,160 @@ function renderSetCfgTable() {
   body.innerHTML = sets.map(s => `
     <tr>
       <td><span class="code-badge">${esc(s.code)}</span></td>
-      <td><input type="text" value="${esc(s.name)}" onblur="saveSetName('${esc(s.code)}', this.value)" /></td>
-      <td style="width:48px;text-align:right">
-        <button class="btn btn-sm btn-ghost" style="color:var(--danger);border-color:var(--danger)" onclick="deleteSet('${esc(s.code)}')">删</button>
+      <td>
+        <input class="edit-input" type="text" value="${esc(s.name)}"
+          oninput="this.classList.add('dirty');this.classList.remove('saved')"
+          onblur="saveSetName('${esc(s.code)}', this)" />
+      </td>
+      <td style="text-align:right">
+        <button class="btn btn-sm btn-danger" onclick="deleteSet('${esc(s.code)}')">删除</button>
       </td>
     </tr>`).join('');
 }
 
 function renderSetList() {
   const wrap = document.getElementById('setList');
-  if (!sets.length) { wrap.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:4px">暂无系列</div>'; return; }
+  if (!sets.length) {
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:4px">暂无系列</div>';
+    updateStartBtn(); return;
+  }
   wrap.innerHTML = sets.map(s => `
     <label class="set-item">
-      <input type="checkbox" class="set-cb" value="${esc(s.code)}" checked />
+      <input type="checkbox" class="set-cb" value="${esc(s.code)}" checked onchange="updateStartBtn()" />
       <span class="set-item-code">${esc(s.code)}</span>
-      <span class="set-item-name">${esc(s.name)}</span>
+      <span class="set-item-name" title="${esc(s.name)}">${esc(s.name)}</span>
     </label>`).join('');
   updateStartBtn();
 }
 
-// ─── 系列 CRUD ───
+// ─── 新增 ───
 function openAddSet() {
   document.getElementById('newSetCode').value = '';
   document.getElementById('newSetName').value = '';
-  document.getElementById('addSetOverlay').style.display = 'flex';
-  document.getElementById('newSetCode').focus();
+  document.getElementById('addSetOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('newSetCode').focus(), 50);
 }
 function closeAddSet() {
-  document.getElementById('addSetOverlay').style.display = 'none';
+  document.getElementById('addSetOverlay').classList.remove('open');
 }
 async function saveNewSet() {
   const code = document.getElementById('newSetCode').value.trim().toUpperCase();
   const name = document.getElementById('newSetName').value.trim();
-  if (!code || !name) { toast('代码和名称均必填'); return; }
+  if (!code) { toast('系列代码不能为空'); return; }
+  if (!name) { toast('系列名称不能为空'); return; }
   if (sets.find(s => s.code === code)) { toast('系列代码 ' + code + ' 已存在'); return; }
   try {
-    const r = await fetch(SB_URL + '/rest/v1/sets', {
-      method: 'POST',
-      headers: { ...SB_HDR(), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ code, name })
-    });
-    if (!r.ok) throw new Error(await r.text());
+    await sbPost('sets', { code, name });
     closeAddSet();
     await loadSets();
-    toast('已添加系列：' + code + ' · ' + name);
+    toast('✓ 已添加：' + code + ' · ' + name);
   } catch(e) { toast('保存失败：' + e.message); }
 }
-async function saveSetName(code, newName) {
-  const name = newName.trim();
+document.addEventListener('keydown', e => {
+  if (document.getElementById('addSetOverlay').classList.contains('open')) {
+    if (e.key === 'Enter')  saveNewSet();
+    if (e.key === 'Escape') closeAddSet();
+  }
+});
+
+// ─── 改名（onblur 触发）───
+async function saveSetName(code, input) {
+  const name = input.value.trim();
   const s = sets.find(x => x.code === code);
-  if (!name || (s && s.name === name)) return;
+  // 值未变或为空时还原
+  if (!name) { input.value = s?.name || ''; input.classList.remove('dirty'); return; }
+  if (s && s.name === name) { input.classList.remove('dirty'); return; }
   try {
     await sbPatch('sets?code=eq.' + encodeURIComponent(code), { name });
     if (s) s.name = name;
+    input.classList.remove('dirty');
+    input.classList.add('saved');
+    setTimeout(() => input.classList.remove('saved'), 1500);
+    renderSetList();
     toast(code + ' 名称已更新');
   } catch(e) { toast('保存失败：' + e.message); }
 }
+
+// ─── 删除 ───
 async function deleteSet(code) {
-  if (!confirm('确认删除系列「' + code + '」？')) return;
+  if (!confirm('确认删除系列「' + code + '」？\n若主站已有该系列的卡牌数据，删除后关联将断裂。')) return;
   try {
-    const r = await fetch(SB_URL + '/rest/v1/sets?code=eq.' + encodeURIComponent(code), {
-      method: 'DELETE',
-      headers: SB_HDR()
-    });
-    if (!r.ok) throw new Error(await r.text());
+    await sbDelete('sets?code=eq.' + encodeURIComponent(code));
     await loadSets();
     toast('已删除：' + code);
   } catch(e) { toast('删除失败：' + e.message); }
 }
 
+// ═══ 连字符管理 ═══
+function renderSepTags() {
+  document.getElementById('sepTags').innerHTML = separators.map((s, i) => `
+    <span class="sep-tag">
+      <span>${esc(s)}</span>
+      <button onclick="removeSep(${i})" title="移除">×</button>
+    </span>`).join('');
+}
+function addSep() {
+  const val = document.getElementById('sepInput').value;
+  if (!val) return;
+  if (separators.includes(val)) { toast('该分隔符已存在'); return; }
+  separators.push(val);
+  document.getElementById('sepInput').value = '';
+  renderSepTags();
+}
+function removeSep(i) {
+  if (separators.length <= 1) { toast('至少保留一个分隔符'); return; }
+  separators.splice(i, 1);
+  renderSepTags();
+}
+
 // ═══ 卡牌编号解析 ═══
-// 官网编号格式混用两种分隔符：SFD·001/221 或 UNL-001/219
-// 统一解析：提取系列前缀 + 序号
+// 目标格式：XXX{sep}num/total
+//   XXX   = 全大写字母的系列代码（与 set.code 完全一致）
+//   {sep} = 在 separators 列表内的连字符
+//   num   = 纯整数，卡牌序号
+//   total = 纯整数，系列编号上限
+// 不符合此格式的编号（T/R 前缀的指示物/符文，含字母后缀的异画/超编）均被过滤
 function parseCardNo(cardNo) {
-  const m = cardNo.match(/^([A-Z]+)[·\-](.+)$/);
+  if (!cardNo) return null;
+  // 动态构造字符类，特殊字符转义
+  const sepClass = separators
+    .map(s => s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'))
+    .join('');
+  const re = new RegExp('^([A-Z]+)[' + sepClass + '](\\d+)\\/(\\d+)$');
+  const m = cardNo.match(re);
   if (!m) return null;
-  return { prefix: m[1], num: m[2].split('/')[0] };
+  return {
+    prefix: m[1],
+    num:    parseInt(m[2], 10),
+    total:  parseInt(m[3], 10),
+  };
 }
 
-// 判断是否为目标卡牌：
-// 1. 编号前缀与系列代码匹配
-// 2. 序号不以 T/R 开头（过滤指示物/符文）
-// 3. 序号不含字母（过滤异画/超编后缀）
+// 有效卡牌判断：
+// 1. 前缀与系列代码完全一致
+// 2. 序号 ≤ total（排除超编卡）
+// 满足 parseCardNo 格式本身已排除：指示物（T开头）、符文（R开头）、异画（序号含字母）
 function isValidCard(cardNo, setCode) {
-  const parsed = parseCardNo(cardNo);
-  if (!parsed) return false;
-  if (parsed.prefix !== setCode) return false;
-  return /^\d+$/.test(parsed.num);  // 序号必须是纯数字
+  const p = parseCardNo(cardNo);
+  if (!p) return false;
+  if (p.prefix !== setCode) return false;
+  return p.num <= p.total;
 }
 
-// ═══ 爬取 ═══
-function checkAll()   { document.querySelectorAll('.set-cb:not(:disabled)').forEach(c => c.checked = true); }
-function uncheckAll() { document.querySelectorAll('.set-cb').forEach(c => c.checked = false); }
+// ═══ 爬取控制 ═══
+function checkAll()   { document.querySelectorAll('.set-cb').forEach(c => c.checked = true);  updateStartBtn(); }
+function uncheckAll() { document.querySelectorAll('.set-cb').forEach(c => c.checked = false); updateStartBtn(); }
 function updateStartBtn() {
   document.getElementById('startBtn').disabled = !document.querySelector('.set-cb:checked');
 }
 
 async function startScrape() {
   const selected = [...document.querySelectorAll('.set-cb:checked')].map(c => c.value);
-  if (!selected.length) { toast('请先勾选系列'); return; }
+  if (!selected.length) { toast('请先勾选至少一个系列'); return; }
 
   const targetSets = sets.filter(s => selected.includes(s.code));
   results = []; stopFlag = false;
+
   document.getElementById('startBtn').disabled = true;
   document.getElementById('stopBtn').disabled = false;
   showLog();
@@ -368,11 +531,10 @@ async function startScrape() {
   document.getElementById('resultBody').innerHTML = '';
   document.getElementById('logBox').innerHTML = '';
   setStats(0, 0, 0);
+  setProgress(0, 1, '请求中…');
 
-  log('info', '▶ 从官网 API 拉取全部卡牌数据…');
-  setProgress(0, 1, '请求中');
-
-  // 一次拉取全部数据（官网无需分页）
+  // ─── 一次性拉取官网全量数据 ───
+  log('info', '▶ 拉取官网全量卡牌数据…');
   let allCards;
   try {
     const r = await fetch(OFFICIAL_API, {
@@ -390,35 +552,44 @@ async function startScrape() {
     return;
   }
 
-  // 按选中系列过滤并处理
-  let valid = 0, skipped = 0;
+  // ─── 逐系列过滤 ───
+  let totalValid = 0, totalSkipped = 0;
 
-  for (const s of targetSets) {
+  for (let i = 0; i < targetSets.length; i++) {
     if (stopFlag) break;
-    log('info', '处理系列：' + s.code);
+    const s = targetSets[i];
+    log('info', '处理系列：' + s.code + ' · ' + s.name);
 
-    // 以编号为唯一标准：前缀=系列代码，序号纯数字，不含 T/R 前缀
-    const setCards = allCards.filter(c => isValidCard(c.cardNo, s.code));
-    log('info', '  匹配到 ' + setCards.length + ' 张');
+    // 该系列前缀匹配的所有卡（含指示物/符文/超编/异画）
+    const allInSet = allCards.filter(c => {
+      const p = parseCardNo(c.cardNo);
+      return p && p.prefix === s.code;
+    });
+    const validInSet   = allInSet.filter(c => isValidCard(c.cardNo, s.code));
+    const skippedInSet = allInSet.length - validInSet.length;
 
-    for (const c of setCards) {
+    log('info', `  收录 ${validInSet.length} 张，跳过 ${skippedInSet} 张（超编/异画/指示物/符文）`);
+
+    for (const c of validInSet) {
       if (stopFlag) break;
-      results.push(mapCard(c, s.code));
-      valid++;
+      // 官网原始字段全部保留，仅附加 set_code 供导入时使用
+      results.push({ ...c, set_code: s.code });
+      totalValid++;
     }
+    totalSkipped += skippedInSet;
 
-    setStats(allCards.length, valid, allCards.length - valid);
-    setProgress(targetSets.indexOf(s) + 1, targetSets.length, s.code);
-    log('ok', '  ✓ 收录 ' + results.filter(r => r.set_code === s.code).length + ' 张有效卡牌');
+    setStats(allCards.length, totalValid, totalSkipped);
+    setProgress(i + 1, targetSets.length, s.code);
+    log('ok', '  ✓ ' + s.code + ' 完成');
   }
 
   document.getElementById('startBtn').disabled = false;
   document.getElementById('stopBtn').disabled = true;
-  setProgress(1, 1, '完成');
+  setProgress(targetSets.length, targetSets.length, '完成');
 
   const msg = stopFlag
-    ? '■ 已停止，收录 ' + valid + ' 张'
-    : '✓ 完成！共收录 ' + valid + ' 张有效卡牌，跳过 ' + skipped + ' 张超编/异画';
+    ? '■ 已停止，收录 ' + totalValid + ' 张'
+    : `✓ 完成！收录 ${totalValid} 张，跳过 ${totalSkipped} 张`;
   log(stopFlag ? 'warn' : 'ok', msg);
   toast(msg);
   if (results.length) renderResults();
@@ -430,42 +601,43 @@ function stopScrape() {
   log('warn', '■ 停止信号已发送…');
 }
 
-// ═══ 字段透传（保留官网原始字段，仅附加 set_code）═══
-function mapCard(c, setCode) {
-  return { ...c, set_code: setCode };
-}
-
 // ═══ 结果渲染 ═══
 function renderResults() {
   document.getElementById('resultCard').style.display = 'block';
   document.getElementById('resultBody').innerHTML = results.map(c => `
     <tr>
-      <td style="font-weight:500">${esc(c.cardName)}${c.subTitle ? '·' + esc(c.subTitle) : ''}</td>
+      <td style="font-weight:500;white-space:nowrap">
+        ${esc(c.cardName)}${c.subTitle ? '<span style="color:var(--muted)">·</span>' + esc(c.subTitle) : ''}
+      </td>
       <td><span class="code-badge" style="font-size:10px">${esc(c.set_code)}</span></td>
-      <td style="font-family:var(--mono);color:var(--mid)">${esc(c.cardNo)}</td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--mid);white-space:nowrap">${esc(c.cardNo)}</td>
       <td><span class="tag">${esc(c.cardCategoryName)}</span></td>
-      <td>${(c.cardColorList || []).map(d => '<span class="tag tag-domain">' + esc(d) + '</span>').join('')}</td>
-      <td style="color:var(--muted)">${esc(c.rarityName)}</td>
+      <td style="white-space:nowrap">
+        ${(c.cardColorList || []).map(d => '<span class="tag tag-color">' + esc(d) + '</span>').join('')}
+      </td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--mid)">${c.energy ?? '—'}</td>
+      <td style="font-family:var(--mono);text-align:center;color:var(--mid)">${c.power ?? '—'}</td>
+      <td style="color:var(--muted);white-space:nowrap">${esc(c.rarityName)}</td>
     </tr>`).join('');
   document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
 }
 
-// ═══ 导出 ═══
+// ═══ 导出（全字段原样导出，不做任何映射）═══
 function exportJSON() {
-  // 直接导出全部字段，所有映射留待导入时处理
   download('riftbound_cards_' + ts() + '.json', JSON.stringify(results, null, 2), 'application/json');
   toast('JSON 已导出（' + results.length + ' 张）');
 }
 function exportCSV() {
   if (!results.length) return;
-  // 动态取列（以第一条记录的 key 为准）
   const h = Object.keys(results[0]);
   const rows = results.map(c => h.map(k => {
     const v = c[k];
-    // 数组字段用 | 拼接
-    return Array.isArray(v) ? v.join('|') : (v ?? '');
+    // 数组/对象序列化为 JSON 字符串
+    return (Array.isArray(v) || (v !== null && typeof v === 'object')) ? JSON.stringify(v) : (v ?? '');
   }));
-  const csv = [h, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+  const csv = [h, ...rows].map(r =>
+    r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')
+  ).join('\n');
   download('riftbound_cards_' + ts() + '.csv', csv, 'text/csv');
   toast('CSV 已导出（' + results.length + ' 张）');
 }
@@ -477,7 +649,10 @@ function download(name, content, type) {
 }
 
 // ═══ UI 工具 ═══
-function setSbStatus(state, msg) { document.getElementById('sbDot').className = 'sync-dot ' + state; document.getElementById('sbLabel').textContent = msg; }
+function setSbStatus(state, msg) {
+  document.getElementById('sbDot').className = 'sync-dot ' + state;
+  document.getElementById('sbLabel').textContent = msg;
+}
 function showLog() { document.getElementById('progressCard').style.display = 'block'; }
 function setProgress(done, total, label) {
   const pct = total ? Math.round(done / total * 100) : 0;
@@ -496,12 +671,23 @@ function log(type, msg) {
   const line = document.createElement('div');
   line.className = 'log-' + type;
   line.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false }) + '  ' + msg;
-  box.appendChild(line); box.scrollTop = box.scrollHeight;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
 }
 let _tt;
-function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(_tt); _tt = setTimeout(() => el.classList.remove('show'), 2500); }
-function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function ts() { return new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-'); }
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 2800);
+}
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function ts() {
+  return new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+}
 </script>
 </body>
 </html>
