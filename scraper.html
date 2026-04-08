@@ -105,29 +105,6 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
 </aside>
 <main class="main-col">
 
-  <!-- 系列配置 -->
-  <div class="card">
-    <div class="card-head">
-      系列配置
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-ghost" onclick="loadSets()">&#8635; 刷新</button>
-      </div>
-    </div>
-    <div class="card-body" style="padding:0">
-      <table class="sets-cfg-table">
-        <thead>
-          <tr><th>代码</th><th>名称</th><th>官网系列代码<span style="font-weight:400;text-transform:none;margin-left:4px;color:var(--muted)">productCode 括号前的部分</span></th></tr>
-        </thead>
-        <tbody id="setCfgBody">
-          <tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">加载中…</td></tr>
-        </tbody>
-      </table>
-      <div style="padding:10px 16px;border-top:1px solid var(--border2);font-size:11px;color:var(--muted)">
-        官网系列代码用于从 playloltcg.com 匹配卡牌。失焦自动保存。已知代码：UNL · SFD · OGN · OGS · ARC
-      </div>
-    </div>
-  </div>
-
   <!-- 进度 -->
   <div class="card" id="progressCard" style="display:none">
     <div class="card-head">
@@ -248,57 +225,27 @@ async function sbPatch(path, body) {
 // ═══ 系列管理 ═══
 async function loadSets() {
   sets = await sbGet('sets?order=code');
-  renderSetCfgTable();
   renderSetList();
 }
 
-function renderSetCfgTable() {
-  const body = document.getElementById('setCfgBody');
-  if (!sets.length) {
-    body.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">暂无系列——请先在主站添加</td></tr>';
-    return;
-  }
-  body.innerHTML = sets.map(s => `
-    <tr data-code="${esc(s.code)}">
-      <td><span class="code-badge">${esc(s.code)}</span></td>
-      <td style="color:var(--mid)">${esc(s.name)}</td>
-      <td><input type="text" value="${esc(s.official_code || '')}" placeholder="如 UNL"
-        onblur="saveCfgField('${esc(s.code)}','official_code',this)" /></td>
-    </tr>`).join('');
-}
 
 function renderSetList() {
   const wrap = document.getElementById('setList');
   if (!sets.length) { wrap.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:4px">暂无系列</div>'; return; }
   wrap.innerHTML = sets.map(s => {
-    const ready = !!s.official_code;
+    const ready = !!s.code;
     return `<label class="set-item">
       <input type="checkbox" class="set-cb" value="${esc(s.code)}" ${ready ? 'checked' : ''} ${ready ? '' : 'disabled'} />
       <span class="set-item-code">${esc(s.code)}</span>
       <span class="set-item-name">${esc(s.name)}</span>
       <span class="${ready ? 'set-item-count' : 'set-item-count'}" style="color:${ready ? 'var(--success)' : 'var(--warn)'}">
-        ${ready ? s.official_code : '⚠ 待配置'}
+        ${ready ? s.code : '⚠ 待配置'}
       </span>
     </label>`;
   }).join('');
   updateStartBtn();
 }
 
-async function saveCfgField(code, field, input) {
-  const val = input.value.trim().toUpperCase() || null;
-  const s = sets.find(x => x.code === code);
-  if (s && s[field] === val) return;
-  input.classList.add('saving');
-  try {
-    await sbPatch('sets?code=eq.' + encodeURIComponent(code), { [field]: val });
-    if (s) s[field] = val;
-    input.value = val || '';
-    input.classList.remove('saving'); input.classList.add('saved');
-    setTimeout(() => input.classList.remove('saved'), 1500);
-    renderSetList(); updateStartBtn();
-    toast(code + ' 已保存');
-  } catch(e) { input.classList.remove('saving'); toast('保存失败：' + e.message); }
-}
 
 // ═══ 爬取 ═══
 function checkAll()   { document.querySelectorAll('.set-cb:not(:disabled)').forEach(c => c.checked = true); }
@@ -347,10 +294,8 @@ async function startScrape() {
 
   for (const s of targetSets) {
     if (stopFlag) break;
-    const officialCode = s.official_code;
-    if (!officialCode) { log('warn', '跳过 ' + s.code + '：未设置官网系列代码'); continue; }
-
-    log('info', '处理系列：' + s.code + ' → 官网代码 ' + officialCode);
+    const officialCode = s.code;
+    log('info', '处理系列：' + s.code);
 
     // 匹配该系列的卡（productCodeList 包含该代码）
     const setCards = allCards.filter(c =>
@@ -406,7 +351,7 @@ function mapCard(c, setCode) {
     card_type,
     domains,
     // 校验字段
-    _official_code: c.cardNo,
+    _card_no: c.cardNo,
     _rarity:        c.rarityName,
     _extend_rarity: c.extendRarityName,
     _category:      c.cardCategoryName,
@@ -430,7 +375,7 @@ function renderResults() {
 
 // ═══ 导出 ═══
 function exportJSON() {
-  const clean = results.map(({ _official_code, _rarity, _extend_rarity, _category, ...r }) => r);
+  const clean = results.map(({ _card_no, _rarity, _extend_rarity, _category, ...r }) => r);
   download('riftbound_cards_' + ts() + '.json', JSON.stringify(clean, null, 2), 'application/json');
   toast('JSON 已导出（' + clean.length + ' 张）');
 }
