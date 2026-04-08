@@ -73,6 +73,7 @@ input[type=number]{font-family:var(--mono)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid var(--border)}}
 </style>
+<!-- v=3e12c37 -->
 </head>
 <body>
 
@@ -231,7 +232,15 @@ const SFC_HEAD={'Content-Type':'application/x-www-form-urlencoded','Client-Versi
 const TYPE_MAP={'单位':'unit','法术':'spell','圣物':'relic','传奇':'legend','战场':'battlefield','符文':'rune'};
 
 let sets=[],results=[],sfcToken='',stopFlag=false;
-function SB_HDR(){'use strict';return{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};}
+function SB_HDR() {
+  // 复用主站 localStorage 里的 Supabase access_token（同域共享）
+  let token = SB_KEY;
+  try {
+    const s = JSON.parse(localStorage.getItem('rb_session') || '{}');
+    if (s.access_token) token = s.access_token;
+  } catch(e) {}
+  return { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + token };
+}
 
 // ═══ 初始化 ═══
 
@@ -242,8 +251,18 @@ function SB_HDR(){'use strict';return{'apikey':SB_KEY,'Authorization':'Bearer '+
     document.getElementById('tokenStatus').style.color='var(--success)';
   }
   setSbStatus('spin','连接中…');
-  try{await loadSets();setSbStatus('ok','已连接');}
-  catch(e){setSbStatus('err','连接失败');showLog();log('err','Supabase 连接失败：'+e.message);}
+  // 检查主站 session
+  let hasSession = false;
+  try { hasSession = !!JSON.parse(localStorage.getItem('rb_session')||'{}').access_token; } catch(e) {}
+  if (!hasSession) {
+    setSbStatus('err', '未登录');
+    showLog();
+    log('warn', '⚠ 请先登录主站（同一浏览器），再回到此页面刷新');
+    updateStartBtn();
+    return;
+  }
+  try { await loadSets(); setSbStatus('ok', '已连接'); }
+  catch(e) { setSbStatus('err','连接失败'); showLog(); log('err','Supabase 连接失败：'+e.message); }
   updateStartBtn();
 })();
 
