@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Riftbound · 卡牌爬取工具</title>
-<!-- v=489d22c -->
+<!-- v=4ae66d6 -->
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0e0f13;--surface:#16181f;--surface2:#1c1f28;--border:#2a2d3a;--border2:#222535;--text:#d0d4e0;--mid:#8890a8;--muted:#4a5068;--gold:#c9a84c;--accent:#5b8dee;--success:#3ecf8e;--warn:#e8a93a;--danger:#e05c5c;--mono:'Courier New',monospace;--sans:'Noto Sans SC',sans-serif;--display:'Cinzel',serif}
@@ -178,7 +178,7 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
       <div class="result-scroll">
         <table class="result-table">
           <thead>
-            <tr><th>中文名</th><th>系列</th><th>编号</th><th>类型</th><th>domains（颜色）</th><th>稀有度</th></tr>
+            <tr><th>卡名</th><th>系列</th><th>编号</th><th>类型</th><th>颜色</th><th>稀有度</th></tr>
           </thead>
           <tbody id="resultBody"></tbody>
         </table>
@@ -197,25 +197,6 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 // ═══ 官网 API（无需认证）═══
 const OFFICIAL_API = 'https://lol-api.playloltcg.com/xcx/card/searchCardCraftWeb';
-
-// ═══ 字段映射 ═══
-// 官网 cardCategory → 项目 card_type
-const CATEGORY_MAP = {
-  'unit':'unit', 'hero_unit':'unit', 'exclusive_unit':'unit',
-  'indicator_unit':'unit',
-  'spell':'spell', 'exclusive_spell':'spell',
-  'equipment':'relic', 'exclusive_equipment':'relic',
-  'indicator_equipment':'relic',
-  'legendary':'legend',
-  'battlefield':'battlefield', 'indicator_battlefield':'battlefield',
-  'rune':'rune',
-};
-// 官网颜色英文值 → 项目 domains 中文特性名
-const COLOR_MAP = {
-  'red':'炽烈', 'green':'翠意', 'blue':'灵光',
-  'orange':'摧破', 'purple':'混沌', 'yellow':'序理',
-  'colorless':'无色',
-};
 
 let sets = [], results = [], stopFlag = false;
 
@@ -269,7 +250,6 @@ async function loadSets() {
   renderSetList();
 }
 
-
 function renderSetCfgTable() {
   const body = document.getElementById('setCfgBody');
   if (!sets.length) {
@@ -297,7 +277,6 @@ function renderSetList() {
     </label>`).join('');
   updateStartBtn();
 }
-
 
 // ─── 系列 CRUD ───
 function openAddSet() {
@@ -416,7 +395,6 @@ async function startScrape() {
 
   for (const s of targetSets) {
     if (stopFlag) break;
-    const officialCode = s.code;
     log('info', '处理系列：' + s.code);
 
     // 以编号为唯一标准：前缀=系列代码，序号纯数字，不含 T/R 前缀
@@ -452,28 +430,9 @@ function stopScrape() {
   log('warn', '■ 停止信号已发送…');
 }
 
-// ═══ 字段映射 ═══
+// ═══ 字段透传（保留官网原始字段，仅附加 set_code）═══
 function mapCard(c, setCode) {
-  const card_type = CATEGORY_MAP[c.cardCategory] || c.cardCategory || 'unknown';
-  const domains   = (c.cardColorList || []).map(col => COLOR_MAP[col] || col).filter(Boolean);
-  // 编号：官网格式 "UNL·001"，转成 "UNL-001"
-  // 统一编号格式：SFD·001/221 或 UNL-001/219 → SFD-001
-  // 输出完整编号如 UNL-219（主站导入时会拆分，只保留数字部分）
-  const _p = parseCardNo(c.cardNo);
-  const card_number = _p ? _p.prefix + '-' + _p.num : (c.cardNo || '').replace('·', '-').split('/')[0];
-  return {
-    name:        c.cardName,
-    img:         c.frontImage || '',
-    set_code:    setCode,
-    card_number,
-    card_type,
-    domains,
-    // 校验字段
-    _card_no: c.cardNo,
-    _rarity:        c.rarityName,
-    _extend_rarity: c.extendRarityName,
-    _category:      c.cardCategoryName,
-  };
+  return { ...c, set_code: setCode };
 }
 
 // ═══ 结果渲染 ═══
@@ -481,26 +440,32 @@ function renderResults() {
   document.getElementById('resultCard').style.display = 'block';
   document.getElementById('resultBody').innerHTML = results.map(c => `
     <tr>
-      <td style="font-weight:500">${esc(c.name)}</td>
+      <td style="font-weight:500">${esc(c.cardName)}${c.subTitle ? '·' + esc(c.subTitle) : ''}</td>
       <td><span class="code-badge" style="font-size:10px">${esc(c.set_code)}</span></td>
-      <td style="font-family:var(--mono);color:var(--mid)">${esc(c.card_number)}</td>
-      <td><span class="tag">${esc(c.card_type)}</span></td>
-      <td>${c.domains.map(d => '<span class="tag tag-domain">' + esc(d) + '</span>').join('')}</td>
-      <td style="color:var(--muted)">${esc(c._rarity)}</td>
+      <td style="font-family:var(--mono);color:var(--mid)">${esc(c.cardNo)}</td>
+      <td><span class="tag">${esc(c.cardCategoryName)}</span></td>
+      <td>${(c.cardColorList || []).map(d => '<span class="tag tag-domain">' + esc(d) + '</span>').join('')}</td>
+      <td style="color:var(--muted)">${esc(c.rarityName)}</td>
     </tr>`).join('');
   document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
 }
 
 // ═══ 导出 ═══
 function exportJSON() {
-  const clean = results.map(({ _card_no, _rarity, _extend_rarity, _category, ...r }) => r);
-  download('riftbound_cards_' + ts() + '.json', JSON.stringify(clean, null, 2), 'application/json');
-  toast('JSON 已导出（' + clean.length + ' 张）');
+  // 直接导出全部字段，所有映射留待导入时处理
+  download('riftbound_cards_' + ts() + '.json', JSON.stringify(results, null, 2), 'application/json');
+  toast('JSON 已导出（' + results.length + ' 张）');
 }
 function exportCSV() {
-  const h = ['name', 'set_code', 'card_number', 'card_type', 'domains', 'img'];
-  const rows = results.map(c => [c.name, c.set_code, c.card_number, c.card_type, c.domains.join('|'), c.img]);
-  const csv = [h, ...rows].map(r => r.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+  if (!results.length) return;
+  // 动态取列（以第一条记录的 key 为准）
+  const h = Object.keys(results[0]);
+  const rows = results.map(c => h.map(k => {
+    const v = c[k];
+    // 数组字段用 | 拼接
+    return Array.isArray(v) ? v.join('|') : (v ?? '');
+  }));
+  const csv = [h, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
   download('riftbound_cards_' + ts() + '.csv', csv, 'text/csv');
   toast('CSV 已导出（' + results.length + ' 张）');
 }
