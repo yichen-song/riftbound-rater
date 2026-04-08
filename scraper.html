@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Riftbound · 卡牌爬取工具</title>
-<!-- v=c197835 -->
+<!-- v=2aec2c6 -->
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0e0f13;--surface:#16181f;--surface2:#1c1f28;--border:#2a2d3a;--border2:#222535;--text:#d0d4e0;--mid:#8890a8;--muted:#4a5068;--gold:#c9a84c;--accent:#5b8dee;--success:#3ecf8e;--warn:#e8a93a;--danger:#e05c5c;--mono:'Courier New',monospace;--sans:'Noto Sans SC',sans-serif;--display:'Cinzel',serif}
@@ -366,9 +366,7 @@ function isValidCard(cardNo, setCode) {
   const parsed = parseCardNo(cardNo);
   if (!parsed) return false;
   if (parsed.prefix !== setCode) return false;
-  if (/^[TR]/i.test(parsed.num)) return false;
-  if (/[a-zA-Z]/.test(parsed.num)) return false;
-  return true;
+  return /^\d+$/.test(parsed.num);  // 序号必须是纯数字
 }
 
 // ═══ 爬取 ═══
