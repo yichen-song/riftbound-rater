@@ -423,7 +423,7 @@ function applyCards(rows) {
 
 function applySets(rows) {
   sets = {};
-  for (const r of rows) sets[r.code] = r.name;
+  for (const r of rows) sets[r.code] = { name: r.name, sortOrder: r.sort_order ?? 0 };
 }
 
 function applyGrades(rows) {
@@ -917,7 +917,7 @@ function renderFilter() {
           onclick="setSetFilter('ALL')">全部系列</div>
         ${activeSets.map(code => `
           <div class="fc fc-all ${activeSetFilter === code ? 'active' : ''}"
-            onclick="setSetFilter('${code}')">${sets[code] || code}</div>
+            onclick="setSetFilter('${code}')">${sets[code]?.name || code}</div>
         `).join('')}
         <select class="sort-select" onchange="setSort(this.value)">
           <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
@@ -975,17 +975,20 @@ function filteredCards() {
     const q = searchQuery.toLowerCase();
     list = list.filter(c => c.name.toLowerCase().includes(q));
   }
-  // 排序
-  if (activeSort !== 'pos') {
-    list = [...list];
-    if (activeSort === 'name-asc')  list.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
-    if (activeSort === 'name-desc') list.sort((a, b) => b.name.localeCompare(a.name, 'zh'));
-    if (activeSort === 'no-asc' || activeSort === 'no-desc') {
-      // 从 cardNo 中提取序号数字（UNL-001/219 → 1）
-      const num = c => parseInt(c.cardNo?.match(/\d+/)?.[0] ?? '0', 10);
-      list.sort((a, b) => activeSort === 'no-asc' ? num(a) - num(b) : num(b) - num(a));
-    }
-  }
+  // 排序：始终以 sets.sort_order 降序为第一键（越大=越新=越前），再按用户选择的第二键
+  list = [...list];
+  const setOrder = c => sets[c.setCode]?.sortOrder ?? 0;
+  const num      = c => parseInt(c.cardNo?.match(/\d+/)?.[0] ?? '0', 10);
+  list.sort((a, b) => {
+    const sd = setOrder(b) - setOrder(a);           // 系列降序（新→旧）
+    if (sd !== 0) return sd;
+    // 第二键
+    if (activeSort === 'name-asc')  return a.name.localeCompare(b.name, 'zh');
+    if (activeSort === 'name-desc') return b.name.localeCompare(a.name, 'zh');
+    if (activeSort === 'no-asc')    return num(a) - num(b);
+    if (activeSort === 'no-desc')   return num(b) - num(a);
+    return (a.pos ?? 0) - (b.pos ?? 0);             // 默认：官网顺序
+  });
   return list;
 }
 
@@ -1200,9 +1203,17 @@ function openLightbox(evt, id) {
   const content = document.getElementById('lbContent');
   const isBattlefield = c.cardCategory === 'battlefield';
   if (c.frontImage) {
-    content.innerHTML = `<img class="lb-img${isBattlefield ? ' lb-img--rotated' : ''}" src="${c.frontImage}" alt="${c.name}"
-      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="lb-ph" style="display:none"><div class="lb-ph-ico">🃏</div></div>`;
+    if (isBattlefield) {
+      content.innerHTML = `<div class="lb-bf-wrap">
+        <img class="lb-img lb-img--rotated" src="${c.frontImage}" alt="${c.name}"
+          onerror="this.style.display='none';this.nextSibling.style.display='flex'">
+        <div class="lb-ph" style="display:none"><div class="lb-ph-ico">🃏</div></div>
+      </div>`;
+    } else {
+      content.innerHTML = `<img class="lb-img" src="${c.frontImage}" alt="${c.name}"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="lb-ph" style="display:none"><div class="lb-ph-ico">🃏</div></div>`;
+    }
   } else {
     content.innerHTML = `<div class="lb-ph"><div class="lb-ph-ico">🃏</div></div>`;
   }
@@ -1217,7 +1228,7 @@ function refreshLbMeta(c) {
   const displayNo = c.cardNo ? c.cardNo.replace(/\/\d+$/, '') : '';
   const noTag  = displayNo ? `<span class="ci-tag card-num">${displayNo}</span>` : '';
   // 系列
-  const setName = c.setCode ? (sets[c.setCode] ? `${sets[c.setCode]}（${c.setCode}）` : c.setCode) : '';
+  const setName = c.setCode ? (sets[c.setCode] ? `${sets[c.setCode].name}（${c.setCode}）` : c.setCode) : '';
   const setTag  = setName ? `<span class="ci-tag">${setName}</span>` : '';
   // 颜色标签
   const colorTags = (c.cardColorList || [])
