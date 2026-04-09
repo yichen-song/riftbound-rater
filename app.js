@@ -10,7 +10,7 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 //  其余按 cardColorList 中的颜色 key 归类
 // ═══════════════════════════════════════════════════════════
 const TABS = [
-  { id:'legends',     label:'传奇', color:'#c9a84c', colorKey: null },
+  { id:'legends',     label:'传奇', color:'#b8c8e0', colorKey: null },
   { id:'red',         label:'炽烈', color:'#e05252', colorKey:'red' },
   { id:'green',       label:'翠意', color:'#52b96e', colorKey:'green' },
   { id:'blue',        label:'灵光', color:'#5b9fe0', colorKey:'blue' },
