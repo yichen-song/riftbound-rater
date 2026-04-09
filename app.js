@@ -668,31 +668,7 @@ async function saveNote(cardId) {
   } catch(e) { console.error('saveNote error', e); setSyncState('err', '同步失败'); }
 }
 
-async function editName(id, el) {
-  const c = allCards.find(c => c.id === id);
-  if (!c) return;
-  const inp = document.createElement('input');
-  inp.value = c.name;
-  inp.style.cssText = 'width:100%;background:var(--bg-input);border:1px solid var(--gold-dark);border-radius:3px;color:var(--text);font-size:11px;padding:2px 5px;font-family:inherit;outline:none;user-select:text;';
-  el.replaceWith(inp); inp.focus(); inp.select();
-  const commit = async () => {
-    const v = inp.value.trim();
-    if (v && v !== c.name) {
-      c.name = v;
-      setSyncState('syncing', '同步中…');
-      try {
-        await sbUpsert('cards', { id: c.id, name: c.name });
-        setSyncState('live', '已同步');
-      } catch(e) { setSyncState('err', '同步失败'); }
-    }
-    renderAll();
-  };
-  inp.addEventListener('blur', commit);
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') renderAll();
-  });
-}
+
 
 async function clearTab() {
   const tab = TABS.find(t => t.id === activeTab);
@@ -1066,7 +1042,7 @@ function renderCards() {
         ${buildPeerBadges(c.id)}
       </div>
       <div class="ci-body">
-        <div class="ci-name" title="点击编辑名称" onclick="editName('${c.id}',this)">${c.name}</div>
+        <div class="ci-name">${c.name}</div>
         ${metaHtml}
         <div class="gb-row">
           ${G.map(g => `<button class="gb ${g.toLowerCase()} ${grade === g ? 'sel' : ''}"
