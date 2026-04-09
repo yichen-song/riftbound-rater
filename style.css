@@ -337,6 +337,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .lb-inner{position:relative;max-width:min(480px,90vw);display:flex;flex-direction:column;align-items:center;gap:12px;}
 /* 战场卡横版需要更宽的容器（宽度 = 普通卡高度） */
 .lb-inner.is-bf{max-width:min(672px,90vw);}
+/* lbContent 需显式宽度，否则战场卡外壳 aspect-ratio 无法计算出尺寸 */
+#lbContent{width:100%;}
 /* 普通卡图片 */
 .lb-img{width:100%;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.8);display:block;}
 /* 战场卡外壳：7:5 横版，尺寸与普通卡宽高对调 */

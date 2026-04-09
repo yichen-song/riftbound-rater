@@ -1208,7 +1208,7 @@ function openLightbox(evt, id) {
     if (isBattlefield) {
       content.innerHTML = `<div class="lb-bf-wrap">
         <img class="lb-img lb-img--rotated" src="${c.frontImage}" alt="${c.name}"
-          onerror="this.style.display='none';this.nextSibling.style.display='flex'">
+          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
         <div class="lb-ph" style="display:none"><div class="lb-ph-ico">🃏</div></div>
       </div>`;
     } else {
