@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Riftbound · 单卡评级</title>
-<link rel="stylesheet" href="style.css?v=6c1e2f8">
+<link rel="stylesheet" href="style.css?v=0604462">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -45,12 +45,10 @@
   </div>
 
   <div class="header-right">
-    <!-- 同步状态 -->
     <div class="sync-pill">
       <div class="sync-dot" id="syncDot"></div>
       <span id="syncLabel">连接中…</span>
     </div>
-    <!-- 当前用户 -->
     <div class="user-pill" id="userPill">
       <span class="user-pill-name" id="userPillName"
         onclick="editDisplayName()" title="点击修改昵称" style="cursor:pointer">—</span>
@@ -71,45 +69,14 @@
 <div class="main">
   <div class="sidebar">
 
-    <div class="sb-sec">
-      <div class="sb-title">添加单卡</div>
-      <div class="add-form">
-        <input type="text" id="inName" placeholder="卡牌名称 *" />
-        <input type="url"  id="inImg"  placeholder="卡图 URL（可选）" />
-        <select id="inCardType" onchange="onCardTypeChange()">
-          <option value="">— 选择类型 *—</option>
-          <option value="legend">Legend · 传奇</option>
-          <option value="battlefield">Battlefield · 战场</option>
-          <option value="unit">Unit · 单位</option>
-          <option value="gear">Gear · 装备</option>
-          <option value="spell">Spell · 法术</option>
-          <option value="rune">Rune · 符文</option>
-        </select>
-        <div id="inDomainsRow" style="display:none">
-          <div class="add-form-label">特性（可多选）</div>
-          <div id="inDomains" class="domain-checks">
-            <label><input type="checkbox" value="炽烈"><span style="color:#e05252">炽烈</span></label>
-            <label><input type="checkbox" value="翠意"><span style="color:#52b96e">翠意</span></label>
-            <label><input type="checkbox" value="灵光"><span style="color:#5b9fe0">灵光</span></label>
-            <label><input type="checkbox" value="摧破"><span style="color:#e07d30">摧破</span></label>
-            <label><input type="checkbox" value="混沌"><span style="color:#9b6de0">混沌</span></label>
-            <label><input type="checkbox" value="序理"><span style="color:#d4b935">序理</span></label>
-          </div>
-        </div>
-        <button class="btn btn-gold" onclick="addCard()" style="width:100%;margin-top:2px">+ 添加</button>
-      </div>
-    </div>
-
     <div class="prog-wrap">
-      <div class="prog-hd"><span id="progLabel">当前页进度</span><span id="progPct">0%</span></div>
+      <div class="prog-hd"><span id="progLabel">全局进度</span><span id="progPct">0%</span></div>
       <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
     </div>
 
-    <!-- 赛制说明（由 JS 按当前赛制动态渲染） -->
+    <!-- 评级说明（按赛制动态渲染）-->
     <div class="sb-title" style="padding:10px 13px 0">评级说明</div>
-    <div class="legend" id="legendPanel">
-      <!-- 由 renderLegend() 填充 -->
-    </div>
+    <div class="legend" id="legendPanel"></div>
 
     <div class="sb-stats" id="sbStats"></div>
   </div>
@@ -127,56 +94,24 @@
 </div><!-- /main-screen -->
 </div><!-- /app -->
 
-    <div class="hint" style="margin-bottom:14px">
-      维护系列代码与全名对照。代码为大写缩写（如 <b>UNL</b>），全名为中文显示名（如 <b>破限</b>）。
-    </div>
-    <div id="setsTableWrap"><!-- 由 renderSetsTable() 填充 --></div>
-    <div class="m-btns" style="margin-top:10px">
-      <button class="btn btn-ghost" onclick="closeSets()">关闭</button>
-      <button class="btn btn-gold"  onclick="addSetRow()">+ 新增系列</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── Import Modal ── -->
 <div class="overlay" id="importOv">
   <div class="modal">
     <div class="modal-title">导入卡牌</div>
-    <div class="import-modes">
-      <div class="imode-btn active" id="iModeJson" onclick="switchImportMode('json')">📄 JSON 文件</div>
-      <div class="imode-btn"         id="iModeText" onclick="switchImportMode('text')">✏ 手动文本</div>
-    </div>
-
-    <!-- JSON file mode -->
-    <div class="imode-panel active" id="iPanelJson">
-      <div class="mf">
-        <label>选择 JSON 文件</label>
-        <input type="file" id="jsonFile" accept=".json"
-          style="background:none;border:none;padding:0;color:var(--text-mid);font-size:12px"
-          onchange="previewJson()" />
-        <div class="hint">
-          支持格式：<b>{"tab名": [{"name":"…","img":"…","card_type":"…","domains":["炽烈"]}]}</b><br>
-          已有卡牌（同名同 Tab）自动跳过，不覆盖现有评级。
-        </div>
-      </div>
-      <div class="import-result" id="jsonResult"></div>
-      <div class="m-btns">
-        <button class="btn btn-ghost" onclick="closeImport()">取消</button>
-        <button class="btn btn-gold"  onclick="doJsonImport()">导入</button>
+    <div class="mf">
+      <label>选择 scraper 导出的 JSON 文件</label>
+      <input type="file" id="jsonFile" accept=".json"
+        style="background:none;border:none;padding:0;color:var(--text-mid);font-size:12px"
+        onchange="previewJson()" />
+      <div class="hint">
+        格式：scraper 导出的平铺数组，以 <b>cardNo</b> 为唯一标识去重。<br>
+        已有卡牌（同 cardNo）自动跳过，不覆盖现有评级。
       </div>
     </div>
-
-    <!-- Text mode -->
-    <div class="imode-panel" id="iPanelText">
-      <div class="mf">
-        <label>每行一张（导入到当前 Tab）</label>
-        <textarea id="bulkTxt" placeholder="月之降临&#10;https://example.com/card.png&#10;皎月护卫|https://example.com/card2.png"></textarea>
-        <div class="hint">格式：<b>卡名</b> / <b>图片URL</b> / <b>卡名|图片URL</b>，重复卡名自动跳过。</div>
-      </div>
-      <div class="m-btns">
-        <button class="btn btn-ghost" onclick="closeImport()">取消</button>
-        <button class="btn btn-gold"  onclick="doBulkImport()">导入</button>
-      </div>
+    <div class="import-result" id="jsonResult"></div>
+    <div class="m-btns">
+      <button class="btn btn-ghost" onclick="closeImport()">取消</button>
+      <button class="btn btn-gold"  onclick="doJsonImport()">导入</button>
     </div>
   </div>
 </div>
@@ -202,7 +137,6 @@
   </div>
 </div>
 
-
 <!-- ── Stats Modal ── -->
 <div class="overlay" id="statsOv">
   <div class="modal modal-wide">
@@ -214,7 +148,7 @@
         <button class="fmt-btn"        id="stFmtL" onclick="switchStatsFormat('limited')">限制</button>
       </div>
     </div>
-    <div id="statsContent"><!-- 由 renderStatsModal() 填充 --></div>
+    <div id="statsContent"></div>
     <div class="m-btns" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="closeStats()">关闭</button>
     </div>
@@ -228,51 +162,11 @@
     <div id="lbContent"></div>
     <div class="lb-name" id="lbName"></div>
     <div class="lb-meta" id="lbMeta"></div>
-    <!-- 卡牌详情编辑（点击展开） -->
-    <div class="lb-edit-wrap" id="lbEditWrap">
-      <button class="lb-edit-toggle" onclick="toggleLbEdit()">✏ 编辑详情</button>
-      <div class="lb-edit-panel" id="lbEditPanel" style="display:none">
-        <div class="lb-edit-row">
-          <label>系列</label>
-          <select id="lbSetCode" onchange="lbSaveField('set_code',this.value)">
-            <option value="">— 无 —</option>
-          </select>
-        </div>
-        <div class="lb-edit-row">
-          <label>编号</label>
-          <input type="number" id="lbCardNumber" min="1"
-            onblur="lbSaveField('card_number', this.value === '' ? null : parseInt(this.value))" />
-        </div>
-        <div class="lb-edit-row">
-          <label>类型</label>
-          <select id="lbCardType" onchange="lbSaveCardType(this.value)">
-            <option value="">— 未设置 —</option>
-            <option value="legend">Legend · 传奇</option>
-            <option value="battlefield">Battlefield · 战场</option>
-            <option value="unit">Unit · 单位</option>
-            <option value="gear">Gear · 装备</option>
-            <option value="spell">Spell · 法术</option>
-            <option value="rune">Rune · 符文</option>
-          </select>
-        </div>
-        <div class="lb-edit-row lb-edit-domains" id="lbDomainsRow">
-          <label>特性</label>
-          <div class="domain-checks domain-checks-sm" id="lbDomains">
-            <label><input type="checkbox" value="炽烈" onchange="lbSaveDomains()"><span style="color:#e05252">炽烈</span></label>
-            <label><input type="checkbox" value="翠意" onchange="lbSaveDomains()"><span style="color:#52b96e">翠意</span></label>
-            <label><input type="checkbox" value="灵光" onchange="lbSaveDomains()"><span style="color:#5b9fe0">灵光</span></label>
-            <label><input type="checkbox" value="摧破" onchange="lbSaveDomains()"><span style="color:#e07d30">摧破</span></label>
-            <label><input type="checkbox" value="混沌" onchange="lbSaveDomains()"><span style="color:#9b6de0">混沌</span></label>
-            <label><input type="checkbox" value="序理" onchange="lbSaveDomains()"><span style="color:#d4b935">序理</span></label>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=6c1e2f8"></script>
+<script src="app.js?v=0604462"></script>
 </body>
 </html>
