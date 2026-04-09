@@ -913,20 +913,34 @@ function renderFilter() {
   const activeSets = [...new Set(tabCards.map(c => c.setCode).filter(Boolean))].sort();
   const setFilterRow = activeSets.length > 1
     ? `<div class="fc-set-row">
-        <div class="fc fc-all ${activeSetFilter === 'ALL' ? 'active' : ''}"
-          onclick="setSetFilter('ALL')">全部系列</div>
-        ${activeSets.map(code => `
-          <div class="fc fc-all ${activeSetFilter === code ? 'active' : ''}"
-            onclick="setSetFilter('${code}')">${sets[code]?.name || code}</div>
-        `).join('')}
+        <div class="fc-set-left">
+          <div class="fc fc-all ${activeSetFilter === 'ALL' ? 'active' : ''}"
+            onclick="setSetFilter('ALL')">全部系列</div>
+          ${activeSets.map(code => `
+            <div class="fc fc-all ${activeSetFilter === code ? 'active' : ''}"
+              onclick="setSetFilter('${code}')">${sets[code]?.name || code}</div>
+          `).join('')}
+        </div>
+        <div class="fc-search">
+          <span class="fc-search-ico">🔍</span>
+          <input id="searchBox" type="text" placeholder="搜索…" value="${searchQuery}"
+            oninput="onSearch(this.value)" />
+        </div>
       </div>`
-    : '';
+    : `<div class="fc-set-row">
+        <div class="fc-set-left"></div>
+        <div class="fc-search">
+          <span class="fc-search-ico">🔍</span>
+          <input id="searchBox" type="text" placeholder="搜索…" value="${searchQuery}"
+            oninput="onSearch(this.value)" />
+        </div>
+      </div>`;
 
   const cnt   = filteredCards().length;
   const total = tabCards.length;
   const countLabel = cnt < total ? `<span class="card-count">${cnt} / ${total}</span>` : '';
 
-  // 排序选择框（移到搜索框右侧栏）
+  // 排序选择框
   const sortSelect = `<select class="sort-select" onchange="setSort(this.value)">
     <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
     <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
@@ -936,16 +950,8 @@ function renderFilter() {
   </select>`;
 
   document.getElementById('filterRow').innerHTML =
-    `<div class="fc-grade-row">${gradeFilters}${countLabel}
-      <div class="fc-right-col">
-        <div class="fc-search">
-          <span class="fc-search-ico">🔍</span>
-          <input id="searchBox" type="text" placeholder="搜索…" value="${searchQuery}"
-            oninput="onSearch(this.value)" />
-        </div>
-        ${sortSelect}
-      </div>
-    </div>` + setFilterRow;
+    setFilterRow +
+    `<div class="fc-grade-row">${gradeFilters}${countLabel}${sortSelect}</div>`;
 }
 
 function setFilter(f)    { activeFilter = f;    renderFilter(); renderCards(); }

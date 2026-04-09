@@ -154,21 +154,23 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 
 /* 筛选栏 */
 .filter-row{display:flex;flex-direction:column;gap:8px;}
-.fc-grade-row{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;}
+
+/* 第一行：系列筛选(左) + 搜索框(右) */
+.fc-set-row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
+.fc-set-left{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;}
+
+/* 第二行：评级筛选(左) + 排序框(右) */
+.fc-grade-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .fc{padding:6px 14px;font-size:12px;font-weight:600;border-radius:4px;cursor:pointer;
   transition:all .15s;white-space:nowrap;border:1px solid transparent;font-family:'Figtree',sans-serif;}
 .fc.fc-all{background:var(--bg-input);border:1px solid var(--border-hi);color:var(--text-dim);}
 .fc.fc-all:hover,.fc.fc-all.active{border-color:var(--gold-dark);color:var(--gold);}
 .card-count{font-size:11px;color:var(--text-mid);font-weight:500;padding:0 4px;font-family:'Figtree',sans-serif;}
 
-/* 右侧栏：搜索 + 排序 */
-.fc-right-col{display:flex;flex-direction:column;gap:6px;margin-left:auto;align-items:flex-end;}
-
-/* 系列筛选行 */
-.fc-set-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+/* 排序选择框 */
 .sort-select{background:var(--bg-input);border:1px solid var(--border-hi);border-radius:4px;
   color:var(--text-mid);font-family:'Figtree',sans-serif;font-size:12px;padding:6px 10px;
-  cursor:pointer;outline:none;transition:all .15s;min-width:120px;}
+  cursor:pointer;outline:none;transition:all .15s;min-width:120px;margin-left:auto;}
 .sort-select:hover,.sort-select:focus{border-color:var(--gold-dark);color:var(--gold);}
 
 /* 搜索框 */
@@ -427,10 +429,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   .legend,.sb-stats{display:none;}
   .card-area{padding:12px;}
   .card-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;}
-  .fc-right-col{width:100%;align-items:stretch;}
+  .fc-set-row{flex-direction:column;align-items:stretch;}
+  .fc-set-left{width:100%;}
+  .fc-search{width:100%;}
   #searchBox{width:100%;}
   #searchBox:focus{width:100%;}
-  .sort-select{width:100%;}
+  .fc-grade-row{flex-direction:column;align-items:stretch;}
+  .sort-select{width:100%;margin-left:0;}
 }
 
 @media(max-width:400px){
