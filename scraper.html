@@ -113,6 +113,11 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 18px;border-radius:20px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:999;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ─── 拖动排序 ─── */
+.drag-handle{color:var(--muted);cursor:grab;font-size:14px;padding:0 6px;user-select:none;text-align:center;}
+.drag-handle:active{cursor:grabbing;}
+.sortable-row.dragging{opacity:.4;}
+.sortable-row.drag-over td{background:rgba(91,141,238,.08);}
 @media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid var(--border)}}
 </style>
 </head>
@@ -182,6 +187,7 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
     <div class="card-head">
       系列管理
       <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-ghost" id="saveOrderBtn" onclick="saveSetOrder()" style="display:none">↑ 保存顺序</button>
         <button class="btn btn-sm btn-ghost" onclick="loadSets()">↻ 刷新</button>
         <button class="btn btn-sm btn-gold" onclick="openAddSet()">+ 新增</button>
       </div>
@@ -189,10 +195,10 @@ input:focus,select:focus{border-color:var(--accent)}input::placeholder{color:var
     <div class="card-body" style="padding:0">
       <table class="sets-table">
         <thead>
-          <tr><th>代码</th><th>系列名称</th><th style="width:60px"></th></tr>
+          <tr><th style="width:28px"></th><th>代码</th><th>系列名称</th><th style="width:60px"></th></tr>
         </thead>
         <tbody id="setCfgBody">
-          <tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">加载中…</td></tr>
+          <tr><td colspan="4" style="color:var(--muted);padding:16px;text-align:center">加载中…</td></tr>
         </tbody>
       </table>
     </div>
@@ -356,7 +362,7 @@ async function sbDelete(path) {
 
 // ═══ 系列管理 ═══
 async function loadSets() {
-  sets = await sbGet('sets?order=code');
+  sets = await sbGet('sets?order=sort_order.desc,code');
   renderSetCfgTable();
   renderSetList();
 }
@@ -364,11 +370,12 @@ async function loadSets() {
 function renderSetCfgTable() {
   const body = document.getElementById('setCfgBody');
   if (!sets.length) {
-    body.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:16px;text-align:center">暂无系列，点击「新增」添加</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:16px;text-align:center">暂无系列，点击「新增」添加</td></tr>';
     return;
   }
   body.innerHTML = sets.map(s => `
-    <tr>
+    <tr draggable="true" data-code="${esc(s.code)}" class="sortable-row">
+      <td class="drag-handle" title="拖动排序">⠿</td>
       <td><span class="code-badge">${esc(s.code)}</span></td>
       <td>
         <input class="edit-input" type="text" value="${esc(s.name)}"
@@ -379,6 +386,7 @@ function renderSetCfgTable() {
         <button class="btn btn-sm btn-danger" onclick="deleteSet('${esc(s.code)}')">删除</button>
       </td>
     </tr>`).join('');
+  initDragSort();
 }
 
 function renderSetList() {
@@ -452,6 +460,64 @@ async function deleteSet(code) {
     await loadSets();
     toast('已删除：' + code);
   } catch(e) { toast('删除失败：' + e.message); }
+}
+
+// ─── 拖动排序 ───
+let dragSrc = null;
+
+function initDragSort() {
+  const rows = document.querySelectorAll('#setCfgBody .sortable-row');
+  rows.forEach(row => {
+    row.addEventListener('dragstart', e => {
+      dragSrc = row;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => row.classList.add('dragging'), 0);
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      document.querySelectorAll('#setCfgBody .sortable-row').forEach(r => r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (row === dragSrc) return;
+      document.querySelectorAll('#setCfgBody .sortable-row').forEach(r => r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    });
+    row.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === row) return;
+      const tbody = row.parentNode;
+      const rows  = [...tbody.querySelectorAll('.sortable-row')];
+      const srcIdx = rows.indexOf(dragSrc);
+      const tgtIdx = rows.indexOf(row);
+      if (srcIdx < tgtIdx) tbody.insertBefore(dragSrc, row.nextSibling);
+      else                 tbody.insertBefore(dragSrc, row);
+      row.classList.remove('drag-over');
+      // 顺序已变，显示保存按钮
+      document.getElementById('saveOrderBtn').style.display = '';
+    });
+  });
+}
+
+// ─── 保存顺序 ───
+// 越靠上的系列获得越大的 sort_order 值（主站排序时 sort_order 降序 = 新系列在前）
+async function saveSetOrder() {
+  const rows = [...document.querySelectorAll('#setCfgBody .sortable-row')];
+  const total = rows.length;
+  const updates = rows.map((row, i) => ({
+    code: row.dataset.code,
+    sort_order: total - i,  // 第一行得到最大值
+  }));
+  try {
+    // 逐条 PATCH（sets 无复合主键，PostgREST 不支持批量 upsert by non-pk）
+    await Promise.all(updates.map(u =>
+      sbPatch('sets?code=eq.' + encodeURIComponent(u.code), { sort_order: u.sort_order })
+    ));
+    // 同步内存中 sets 的 sort_order
+    updates.forEach(u => { const s = sets.find(x => x.code === u.code); if (s) s.sort_order = u.sort_order; });
+    document.getElementById('saveOrderBtn').style.display = 'none';
+    toast('✓ 系列顺序已保存');
+  } catch(e) { toast('保存失败：' + e.message); }
 }
 
 // ═══ 连字符管理 ═══
