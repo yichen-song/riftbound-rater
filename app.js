@@ -85,7 +85,7 @@ let activeTab       = 'legends';
 let activeFormat    = 'constructed';  // 'constructed' | 'limited'
 let activeFilter    = 'ALL';          // 'ALL' | 'S'..'D' | 'NONE'
 let activeSetFilter = 'ALL';          // 'ALL' | setCode，全局跨 tab 共用，切 tab 不重置
-let activeSort      = 'pos';          // 'pos' | 'name-asc' | 'name-desc' | 'no-asc' | 'no-desc'
+let activeSort      = 'no-desc';      // 'no-desc' | 'no-asc' | 'name-asc' | 'name-desc' | 'pos'
 let searchQuery     = '';
 let commentTimer    = null;
 let noteTimer       = null;
@@ -944,20 +944,20 @@ function renderFilter() {
             onclick="setSetFilter('${code}')">${sets[code] || code}</div>
         `).join('')}
         <select class="sort-select" onchange="setSort(this.value)">
-          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
+          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
+          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
           <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
           <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
-          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
-          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
+          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>官网顺序</option>
         </select>
       </div>`
     : `<div class="fc-set-row">
         <select class="sort-select" onchange="setSort(this.value)">
-          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
+          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
+          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
           <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
           <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
-          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
-          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
+          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>官网顺序</option>
         </select>
       </div>`;
 
@@ -1000,16 +1000,13 @@ function filteredCards() {
     list = list.filter(c => c.name.toLowerCase().includes(q));
   }
   // 排序
-  if (activeSort !== 'pos') {
-    list = [...list];
-    if (activeSort === 'name-asc')  list.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
-    if (activeSort === 'name-desc') list.sort((a, b) => b.name.localeCompare(a.name, 'zh'));
-    if (activeSort === 'no-asc' || activeSort === 'no-desc') {
-      // 从 cardNo 中提取序号数字（UNL-001/219 → 1）
-      const num = c => parseInt(c.cardNo?.match(/\d+/)?.[0] ?? '0', 10);
-      list.sort((a, b) => activeSort === 'no-asc' ? num(a) - num(b) : num(b) - num(a));
-    }
+  if (activeSort === 'name-asc')  list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+  else if (activeSort === 'name-desc') list = [...list].sort((a, b) => b.name.localeCompare(a.name, 'zh'));
+  else if (activeSort === 'no-asc' || activeSort === 'no-desc') {
+    const num = c => parseInt(c.cardNo?.match(/\d+/)?.[0] ?? '0', 10);
+    list = [...list].sort((a, b) => activeSort === 'no-asc' ? num(a) - num(b) : num(b) - num(a));
   }
+  // activeSort === 'pos' 时保持 allCards 原顺序（已按 pos 加载）
   return list;
 }
 
