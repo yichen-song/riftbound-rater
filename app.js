@@ -1202,6 +1202,8 @@ function openLightbox(evt, id) {
 
   const content = document.getElementById('lbContent');
   const isBattlefield = c.cardCategory === 'battlefield';
+  document.getElementById('lbInner').classList.toggle('is-bf', isBattlefield);
+
   if (c.frontImage) {
     if (isBattlefield) {
       content.innerHTML = `<div class="lb-bf-wrap">
