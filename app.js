@@ -5,29 +5,43 @@ const SB_URL = 'https://vepqjryrhvuehwemabqu.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlcHFqcnlyaHZ1ZWh3ZW1hYnF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjA2MjYsImV4cCI6MjA5MDQzNjYyNn0.8ZWqTUwEQX1zFwTCLx7eqwfocDmw5DId2rrxoxDjrPk';
 
 // ═══════════════════════════════════════════════════════════
-//  TAB CONFIG  （由 card_type + domains 推导，不存 tab 字段）
+//  TAB CONFIG
+//  legendary / battlefield 按 cardCategory 归类
+//  其余按 cardColorList 中的颜色 key 归类
 // ═══════════════════════════════════════════════════════════
 const TABS = [
-  { id:'legends',     label:'传奇',  color:'#c9a84c', domain: null },
-  { id:'red',         label:'炽烈',  color:'#e05252', domain:'炽烈' },
-  { id:'green',       label:'翠意',  color:'#52b96e', domain:'翠意' },
-  { id:'blue',        label:'灵光',  color:'#5b9fe0', domain:'灵光' },
-  { id:'orange',      label:'摧破',  color:'#e07d30', domain:'摧破' },
-  { id:'purple',      label:'混沌',  color:'#9b6de0', domain:'混沌' },
-  { id:'yellow',      label:'序理',  color:'#d4b935', domain:'序理' },
-  { id:'battlefield', label:'战场',  color:'#7a8599', domain: null },
+  { id:'legends',     label:'传奇', color:'#c9a84c', colorKey: null },
+  { id:'red',         label:'炽烈', color:'#e05252', colorKey:'red' },
+  { id:'green',       label:'翠意', color:'#52b96e', colorKey:'green' },
+  { id:'blue',        label:'灵光', color:'#5b9fe0', colorKey:'blue' },
+  { id:'orange',      label:'摧破', color:'#e07d30', colorKey:'orange' },
+  { id:'purple',      label:'混沌', color:'#9b6de0', colorKey:'purple' },
+  { id:'yellow',      label:'序理', color:'#d4b935', colorKey:'yellow' },
+  { id:'battlefield', label:'战场', color:'#7a8599', colorKey: null },
 ];
 
-// Tab 过滤：legend 强制归「传奇」，battlefield 归「战场」，其余按 domains
+// 官网颜色 key → 中文特性名（展示用）
+const COLOR_LABEL = {
+  red:'炽烈', green:'翠意', blue:'灵光',
+  orange:'摧破', purple:'混沌', yellow:'序理',
+};
+
+// 官网颜色 key → 十六进制色（卡片标签着色用）
+const COLOR_HEX = {
+  red:'#e05252', green:'#52b96e', blue:'#5b9fe0',
+  orange:'#e07d30', purple:'#9b6de0', yellow:'#d4b935',
+};
+
+// Tab 过滤：legendary/battlefield 按 cardCategory，其余按 cardColorList
 function getCardsForTab(tabId, cards) {
+  if (tabId === 'legends')     return cards.filter(c => c.cardCategory === 'legendary');
+  if (tabId === 'battlefield') return cards.filter(c => c.cardCategory === 'battlefield');
   const tab = TABS.find(t => t.id === tabId);
-  if (!tab) return [];
-  if (tabId === 'legends')     return cards.filter(c => c.card_type === 'legend');
-  if (tabId === 'battlefield') return cards.filter(c => c.card_type === 'battlefield');
+  if (!tab?.colorKey) return [];
   return cards.filter(c =>
-    c.card_type !== 'legend' &&
-    c.card_type !== 'battlefield' &&
-    Array.isArray(c.domains) && c.domains.includes(tab.domain)
+    c.cardCategory !== 'legendary' &&
+    c.cardCategory !== 'battlefield' &&
+    Array.isArray(c.cardColorList) && c.cardColorList.includes(tab.colorKey)
   );
 }
 
@@ -35,9 +49,7 @@ function getCardsForTab(tabId, cards) {
 const G  = ['S','A','B','C','D'];
 const GC = { S:'#c0392b', A:'#d4820a', B:'#1e8449', C:'#1a6fa8', D:'#3d4455' };
 const GF = { S:'#fff',    A:'#fff',    B:'#fff',    C:'#fff',    D:'#9aa' };
-const GRADE_VALUE = { S:5, A:4, B:3, C:2, D:1 };
-
-// 评级说明：构筑 / 限制 各一套（标题 + 描述分开存，方便侧边栏渲染）
+// 评级说明：构筑 / 限制 各一套
 const GL = {
   constructed: {
     S:{ title:'版本定义级', desc:'强度足以主导版本环境，是套牌的绝对核心。会围绕此卡构建策略，大概率受到对手的特殊针对。具备禁限候选潜力。' },
@@ -55,16 +67,10 @@ const GL = {
   },
 };
 
-// 特性 → 颜色映射（用于 ci-tag）
-const DOMAIN_COLOR = {
-  '炽烈':'#e05252','翠意':'#52b96e','灵光':'#5b9fe0',
-  '摧破':'#e07d30','混沌':'#9b6de0','序理':'#d4b935',
-};
-
 // ═══════════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════════
-// allCards = [{ id, name, img, pos, set_code, card_number, card_type, domains }]
+// allCards = [{ id, name, frontImage, setCode, cardNo, cardCategory, cardColorList, pos }]
 let allCards  = [];
 // sets = { 'UNL': '破限', ... }
 let sets      = {};
@@ -72,27 +78,26 @@ let sets      = {};
 let grades    = {};
 // notes[card_id][user_id] = { note }
 let notes     = {};
-// allUsers = [{ id, display_name }]（从评级数据中收集）
+// allUsers = [{ id, display_name }]
 let allUsers  = [];
 
-let activeTab    = 'legends';
-let activeFormat = 'constructed';   // 'constructed' | 'limited'
-let activeFilter = 'ALL';
-let searchQuery  = '';
-let commentTimer = null;
-let noteTimer    = null;
+let activeTab       = 'legends';
+let activeFormat    = 'constructed';  // 'constructed' | 'limited'
+let activeFilter    = 'ALL';          // 'ALL' | 'S'..'D' | 'NONE'
+let activeSetFilter = 'ALL';          // 'ALL' | setCode，全局跨 tab 共用，切 tab 不重置
+let searchQuery     = '';
+let commentTimer    = null;
+let noteTimer       = null;
 let realtimeChannel = null;
-let isLoading    = true;
-let focusedCardId = null;
+let isLoading       = true;
+let focusedCardId   = null;
 
 // ── Auth state ───────────────────────────────────────────────
-// currentUser = { id, email, display_name, access_token, refresh_token, expires_at }
 let currentUser = null;
 
 // ═══════════════════════════════════════════════════════════
 //  SUPABASE HELPERS
 // ═══════════════════════════════════════════════════════════
-// 登录后用 access_token，否则 fallback 到 anon key
 const SB_HDR = () => ({
   'apikey':        SB_KEY,
   'Authorization': 'Bearer ' + (currentUser?.access_token ?? SB_KEY),
@@ -109,8 +114,6 @@ async function sbFetch(path, method = 'GET', body = null) {
   return r.json();
 }
 
-// Upsert（通用）：传入表名和行数据（单行或数组）
-// onConflict: 指定 unique constraint 列（逗号分隔），用于非主键 unique 约束的 upsert
 async function sbUpsert(table, rows, onConflict = null) {
   const prefer = 'resolution=merge-duplicates,return=minimal';
   const hdrs = { ...SB_HDR(), 'Prefer': prefer };
@@ -122,45 +125,33 @@ async function sbUpsert(table, rows, onConflict = null) {
   if (!r.ok) throw new Error(`upsert(${table}) ${r.status}: ${await r.text()}`);
 }
 
-
 // ═══════════════════════════════════════════════════════════
 //  MINIMAL SUPABASE REALTIME CLIENT
-//  Speaks the Phoenix/Supabase WebSocket protocol
-//  No external dependencies needed
 // ═══════════════════════════════════════════════════════════
 function createRealtimeClient(supabaseUrl, apiKey) {
   const wsUrl = supabaseUrl.replace(/^https/, 'wss').replace(/^http/, 'ws')
     + '/realtime/v1/websocket?apikey=' + apiKey + '&vsn=1.0.0';
 
-  let ws = null;
-  let channels = [];
-  let heartbeatTimer = null;
-  let ref = 0;
+  let ws = null, channels = [], heartbeatTimer = null, ref = 0;
   const nextRef = () => String(++ref);
 
   function connect() {
     ws = new WebSocket(wsUrl);
-
     ws.onopen = () => {
       heartbeatTimer = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
+        if (ws.readyState === WebSocket.OPEN)
           ws.send(JSON.stringify({ topic:'phoenix', event:'heartbeat', payload:{}, ref: nextRef() }));
-        }
       }, 25000);
       channels.forEach(ch => ch._join());
     };
-
     ws.onmessage = (evt) => {
-      let msg;
-      try { msg = JSON.parse(evt.data); } catch { return; }
+      let msg; try { msg = JSON.parse(evt.data); } catch { return; }
       channels.forEach(ch => ch._receive(msg));
     };
-
     ws.onclose = () => {
       clearInterval(heartbeatTimer);
       channels.forEach(ch => { if (ch._statusCallback) ch._statusCallback('CLOSED'); });
     };
-
     ws.onerror = () => {
       channels.forEach(ch => { if (ch._statusCallback) ch._statusCallback('CHANNEL_ERROR'); });
     };
@@ -170,53 +161,31 @@ function createRealtimeClient(supabaseUrl, apiKey) {
     const fullTopic = 'realtime:' + topic;
     const bindings  = [];
     let   statusCb  = null;
-
     const ch = {
       _statusCallback: null,
-
-      on(event, filter, callback) {
-        bindings.push({ event, filter, callback });
-        return ch;
-      },
-
+      on(event, filter, callback) { bindings.push({ event, filter, callback }); return ch; },
       subscribe(callback) {
-        statusCb = callback;
-        ch._statusCallback = callback;
-        channels.push(ch);
-        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-          connect();
-        } else if (ws.readyState === WebSocket.OPEN) {
-          ch._join();
-        }
+        statusCb = callback; ch._statusCallback = callback; channels.push(ch);
+        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) connect();
+        else if (ws.readyState === WebSocket.OPEN) ch._join();
         return ch;
       },
-
       unsubscribe() {
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (ws && ws.readyState === WebSocket.OPEN)
           ws.send(JSON.stringify({ topic: fullTopic, event: 'phx_leave', payload: {}, ref: nextRef() }));
-        }
         channels = channels.filter(c => c !== ch);
       },
-
       _join() {
-        const pgBindings = bindings
-          .filter(b => b.event === 'postgres_changes')
-          .map(b => ({
-            event:  b.filter.event  || '*',
-            schema: b.filter.schema || 'public',
-            table:  b.filter.table,
-            filter: b.filter.filter,
-          }));
+        const pgBindings = bindings.filter(b => b.event === 'postgres_changes').map(b => ({
+          event: b.filter.event || '*', schema: b.filter.schema || 'public',
+          table: b.filter.table, filter: b.filter.filter,
+        }));
         ws.send(JSON.stringify({
           topic: fullTopic, event: 'phx_join',
-          payload: { config: {
-            broadcast: { self: false }, presence: { key: '' },
-            postgres_changes: pgBindings,
-          }},
+          payload: { config: { broadcast:{ self:false }, presence:{ key:'' }, postgres_changes: pgBindings }},
           ref: nextRef(),
         }));
       },
-
       _receive(msg) {
         if (msg.topic !== fullTopic) return;
         if (msg.event === 'phx_reply') {
@@ -229,25 +198,19 @@ function createRealtimeClient(supabaseUrl, apiKey) {
           const data = msg.payload?.data || msg.payload;
           bindings.filter(b => b.event === 'postgres_changes').forEach(b => {
             const evType = data.type || data.eventType;
-            if (b.filter.event === '*' || b.filter.event === evType) {
-              b.callback({
-                eventType: evType,
-                new: data.record     || data.new || {},
-                old: data.old_record || data.old || {},
-                table: data.table, schema: data.schema,
-              });
-            }
+            if (b.filter.event === '*' || b.filter.event === evType)
+              b.callback({ eventType: evType,
+                new: data.record||data.new||{}, old: data.old_record||data.old||{},
+                table: data.table, schema: data.schema });
           });
           return;
         }
-        if (msg.event === 'system' && msg.payload?.message?.includes('subscribed')) {
+        if (msg.event === 'system' && msg.payload?.message?.includes('subscribed'))
           if (statusCb) statusCb('SUBSCRIBED');
-        }
       },
     };
     return ch;
   }
-
   return { channel };
 }
 
@@ -264,8 +227,8 @@ function showAuthScreen() {
 function showMainScreen() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainScreen').style.display = '';
-  const name = currentUser?.display_name || currentUser?.email || '—';
-  document.getElementById('userPillName').textContent = name;
+  document.getElementById('userPillName').textContent =
+    currentUser?.display_name || currentUser?.email || '—';
 }
 
 async function doLogin() {
@@ -289,21 +252,15 @@ async function doLogin() {
     showMainScreen();
     setSyncState('syncing', '连接中…');
     showSkeleton();
-    // 确保自己的 profile 行存在（新用户首次登录时创建）
     sbUpsert('profiles', { id: currentUser.id, display_name: currentUser.display_name }).catch(() => {});
     await loadAll();
     subscribeRealtime();
-  } catch(e) {
-    errEl.textContent = e.message;
-  }
+  } catch(e) { errEl.textContent = e.message; }
   btn.classList.remove('loading'); btn.textContent = '登录';
 }
 
-// script 在 </body> 前加载，DOM 已就绪，无需 DOMContentLoaded 包装
 ['authEmail','authPassword'].forEach(id => {
-  document.getElementById(id)?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') doLogin();
-  });
+  document.getElementById(id)?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 });
 
 async function doLogout() {
@@ -314,8 +271,7 @@ async function doLogout() {
     });
   } catch {}
   clearSession();
-  realtimeChannel?.unsubscribe();
-  realtimeChannel = null;
+  realtimeChannel?.unsubscribe(); realtimeChannel = null;
   currentUser = null;
   allCards = []; grades = {}; notes = {}; allUsers = [];
   isLoading = true;
@@ -324,7 +280,6 @@ async function doLogout() {
   document.getElementById('authErr').textContent = '';
 }
 
-// ── 修改昵称（点击右上角用户名触发）────────────────────────────
 async function editDisplayName() {
   const current = currentUser.display_name;
   const next = prompt('修改昵称：', current);
@@ -336,7 +291,6 @@ async function editDisplayName() {
     document.getElementById('userPillName').textContent = name;
     const self = allUsers.find(u => u.id === currentUser.id);
     if (self) self.display_name = name;
-    // 同步更新 localStorage
     try {
       const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
       if (saved.user) {
@@ -345,9 +299,7 @@ async function editDisplayName() {
       }
     } catch {}
     toast('昵称已更新：' + name);
-  } catch(e) {
-    toast('修改失败：' + e.message);
-  }
+  } catch(e) { toast('修改失败：' + e.message); }
 }
 
 function applySession(data) {
@@ -383,11 +335,7 @@ async function restoreSession() {
   let saved;
   try { saved = JSON.parse(localStorage.getItem(SESSION_KEY)); } catch {}
   if (!saved?.access_token) return false;
-
-  // expires_at 不存在说明是旧格式 session（部署前存的，不含时间戳）
-  // 不能用 fallback 猜测，必须强制 refresh，否则过期 token 会被误判为有效
   if (!saved.expires_at) return await refreshSession(saved.refresh_token);
-
   if (Date.now() < saved.expires_at - 60_000) {
     applySession({ ...saved, expires_in: Math.floor((saved.expires_at - Date.now()) / 1000) });
     return true;
@@ -405,25 +353,17 @@ async function refreshSession(refreshToken) {
     });
     if (!r.ok) { clearSession(); return false; }
     const data = await r.json();
-
-    // applySession 从 JWT user_metadata 读 display_name，管理员建的账号该字段为空，
-    // 会被回退成邮箱前缀。先记住已知的正确昵称，续期后补回去。
     const knownName = currentUser?.display_name || null;
     applySession(data);
     if (knownName && !data.user?.user_metadata?.display_name) {
       currentUser.display_name = knownName;
-      // 同步写入 localStorage，下次刷新页面也能读到正确昵称
       data.user.user_metadata = { ...data.user.user_metadata, display_name: knownName };
     }
     saveSession(data);
-
     const delay = ((data.expires_in ?? 3600) - 120) * 1000;
     if (delay > 0) setTimeout(() => refreshSession(currentUser?.refresh_token), delay);
     return true;
-  } catch {
-    clearSession();
-    return false;
-  }
+  } catch { clearSession(); return false; }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -441,12 +381,10 @@ async function boot() {
   } catch(e) {
     console.error('boot error', e);
     setSyncState('err', '连接失败');
-    isLoading = false;
-    renderAll();
+    isLoading = false; renderAll();
   }
 }
 
-// ── 加载全部数据（三张表并发）────────────────────────────────
 async function loadAll() {
   setSyncState('syncing', '加载中…');
   try {
@@ -464,23 +402,21 @@ async function loadAll() {
     collectUsers(gradeRows || [], noteRows || [], profileRows || []);
     setSyncState('live', '已同步');
   } catch(e) {
-    console.error('load error', e);
-    setSyncState('err', '加载失败');
+    console.error('load error', e); setSyncState('err', '加载失败');
   }
-  isLoading = false;
-  renderAll();
+  isLoading = false; renderAll();
 }
 
 function applyCards(rows) {
   allCards = rows.map(r => ({
-    id:          r.id,
-    name:        r.name,
-    img:         r.img || '',
-    pos:         r.pos || 0,
-    set_code:    r.set_code    || '',
-    card_number: r.card_number ?? null,
-    card_type:   r.card_type   || '',
-    domains:     Array.isArray(r.domains) ? r.domains : [],
+    id:            r.id,
+    name:          r.name,
+    frontImage:    r.frontImage    || '',
+    setCode:       r.setCode       || '',
+    cardNo:        r.cardNo        || '',
+    cardCategory:  r.cardCategory  || '',
+    cardColorList: Array.isArray(r.cardColorList) ? r.cardColorList : [],
+    pos:           r.pos || 0,
   }));
 }
 
@@ -494,10 +430,7 @@ function applyGrades(rows) {
   for (const r of rows) {
     if (!grades[r.card_id]) grades[r.card_id] = {};
     if (!grades[r.card_id][r.user_id]) grades[r.card_id][r.user_id] = {};
-    grades[r.card_id][r.user_id][r.format] = {
-      grade:   r.grade   || null,
-      comment: r.comment || '',
-    };
+    grades[r.card_id][r.user_id][r.format] = { grade: r.grade || null, comment: r.comment || '' };
   }
 }
 
@@ -509,28 +442,19 @@ function applyNotes(rows) {
   }
 }
 
-// 从 profiles 表和评级/备注数据中建立用户列表
 function collectUsers(gradeRows, noteRows, profileRows) {
-  // 先建 profiles 查找表 { user_id: display_name }
   const profileMap = {};
   for (const p of profileRows) profileMap[p.id] = p.display_name;
-
-  // 收集所有出现过的 user_id
   const seen = new Set();
   for (const r of [...gradeRows, ...noteRows]) seen.add(r.user_id);
-  // 自己也要在列表里
   seen.add(currentUser.id);
-
   allUsers = [...seen].map(id => ({
     id,
     display_name: profileMap[id] || (id === currentUser.id ? currentUser.display_name : id.slice(0, 6)),
   }));
-
-  // 用 profiles 里的名字更新 currentUser.display_name（以数据库为准）
   if (profileMap[currentUser.id]) {
     currentUser.display_name = profileMap[currentUser.id];
     document.getElementById('userPillName').textContent = currentUser.display_name;
-    // 同步回 localStorage，避免下次刷新时 applySession 从 JWT user_metadata 读到旧的邮箱前缀
     try {
       const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
       if (saved.user) {
@@ -547,30 +471,20 @@ function myComment(cardId, format) { return grades[cardId]?.[currentUser.id]?.[f
 function myNote(cardId)            { return notes[cardId]?.[currentUser.id]?.note || ''; }
 
 // ═══════════════════════════════════════════════════════════
-//  SUPABASE REALTIME  （订阅三张表）
+//  SUPABASE REALTIME
 // ═══════════════════════════════════════════════════════════
 function subscribeRealtime() {
   const client = createRealtimeClient(SB_URL, SB_KEY);
   const ch = client.channel('riftbound_changes');
-
-  ch.on('postgres_changes', { event: '*', schema: 'public', table: 'cards' },
-    p => handleCardsEvent(p));
-  ch.on('postgres_changes', { event: '*', schema: 'public', table: 'card_grades' },
-    p => handleGradesEvent(p));
-  ch.on('postgres_changes', { event: '*', schema: 'public', table: 'card_notes' },
-    p => handleNotesEvent(p));
-
+  ch.on('postgres_changes', { event:'*', schema:'public', table:'cards' },       p => handleCardsEvent(p));
+  ch.on('postgres_changes', { event:'*', schema:'public', table:'card_grades' }, p => handleGradesEvent(p));
+  ch.on('postgres_changes', { event:'*', schema:'public', table:'card_notes' },  p => handleNotesEvent(p));
   ch.subscribe(status => {
     if (status === 'SUBSCRIBED') {
-      setSyncState('live', '实时同步');
-      realtimeChannel = ch;
+      setSyncState('live', '实时同步'); realtimeChannel = ch;
     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
       setSyncState('err', '连接断开');
-      setTimeout(() => {
-        setSyncState('syncing', '重连中…');
-        ch.unsubscribe();
-        subscribeRealtime();
-      }, 5000);
+      setTimeout(() => { setSyncState('syncing', '重连中…'); ch.unsubscribe(); subscribeRealtime(); }, 5000);
     } else if (status === 'CLOSED') {
       setSyncState('err', '已断开');
     }
@@ -581,9 +495,11 @@ function handleCardsEvent({ eventType, new: n, old: o }) {
   if (eventType === 'INSERT') {
     if (allCards.find(c => c.id === n.id)) return;
     allCards.push({
-      id: n.id, name: n.name, img: n.img || '', pos: n.pos || 0,
-      set_code: n.set_code || '', card_number: n.card_number ?? null,
-      card_type: n.card_type || '', domains: Array.isArray(n.domains) ? n.domains : [],
+      id: n.id, name: n.name, frontImage: n.frontImage || '',
+      setCode: n.setCode || '', cardNo: n.cardNo || '',
+      cardCategory: n.cardCategory || '',
+      cardColorList: Array.isArray(n.cardColorList) ? n.cardColorList : [],
+      pos: n.pos || 0,
     });
     allCards.sort((a, b) => a.pos - b.pos);
     renderAll();
@@ -591,9 +507,11 @@ function handleCardsEvent({ eventType, new: n, old: o }) {
     const card = allCards.find(c => c.id === n.id);
     if (!card) return;
     Object.assign(card, {
-      name: n.name, img: n.img || '', pos: n.pos || 0,
-      set_code: n.set_code || '', card_number: n.card_number ?? null,
-      card_type: n.card_type || '', domains: Array.isArray(n.domains) ? n.domains : [],
+      name: n.name, frontImage: n.frontImage || '',
+      setCode: n.setCode || '', cardNo: n.cardNo || '',
+      cardCategory: n.cardCategory || '',
+      cardColorList: Array.isArray(n.cardColorList) ? n.cardColorList : [],
+      pos: n.pos || 0,
     });
     patchCardDom(); renderTabs();
   } else if (eventType === 'DELETE') {
@@ -610,9 +528,8 @@ function handleGradesEvent({ eventType, new: n, old: o }) {
     if (!grades[n.card_id]) grades[n.card_id] = {};
     if (!grades[n.card_id][n.user_id]) grades[n.card_id][n.user_id] = {};
     grades[n.card_id][n.user_id][n.format] = { grade: n.grade || null, comment: n.comment || '' };
-    if (!allUsers.find(u => u.id === n.user_id)) {
+    if (!allUsers.find(u => u.id === n.user_id))
       allUsers.push({ id: n.user_id, display_name: n.user_id.slice(0, 6) });
-    }
   }
   patchCardDom(); renderTabs(); renderStats(); renderProgress();
   setSyncState('live', '实时同步');
@@ -629,7 +546,7 @@ function handleNotesEvent({ eventType, new: n, old: o }) {
   setSyncState('live', '实时同步');
 }
 
-// Smart DOM patch — 更新卡片状态，不销毁正在输入的 textarea
+// Smart DOM patch — 不销毁正在输入的 textarea
 function patchCardDom() {
   const focusedEl = document.activeElement;
   const isFocused = focusedEl?.tagName === 'TEXTAREA';
@@ -645,11 +562,9 @@ function patchCardDom() {
     const gc    = grade ? GC[grade] : null;
     const gf    = grade ? GF[grade] : null;
 
-    // Border
     if (gc) { el.dataset.g = grade; el.style.setProperty('--gc', gc); }
     else    { delete el.dataset.g; el.style.removeProperty('--gc'); }
 
-    // Grade ribbon
     const thumb = el.querySelector('.ci-thumb');
     let ribbon = thumb.querySelector('.ci-ribbon');
     if (grade) {
@@ -657,16 +572,13 @@ function patchCardDom() {
       ribbon.style.background = gc; ribbon.style.color = gf; ribbon.textContent = grade;
     } else ribbon?.remove();
 
-    // Peer badges
     const peersEl = thumb.querySelector('.ci-peers');
     const newBadges = buildPeerBadges(c.id);
     if (peersEl) peersEl.outerHTML = newBadges;
     else if (newBadges) thumb.insertAdjacentHTML('beforeend', newBadges);
 
-    // Grade buttons
     el.querySelectorAll('.gb').forEach((btn, i) => btn.classList.toggle('sel', G[i] === grade));
 
-    // Textareas（不覆盖当前焦点）
     const commentEl = el.querySelector('.comment-box');
     if (commentEl && commentEl !== focusedEl) commentEl.value = myComment(c.id);
     const noteEl = el.querySelector('.note-box');
@@ -679,56 +591,6 @@ function patchCardDom() {
 // ═══════════════════════════════════════════════════════════
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
-async function addCard() {
-  const name      = document.getElementById('inName').value.trim();
-  const img       = document.getElementById('inImg').value.trim();
-  const card_type = document.getElementById('inCardType').value;  // 'legend'|'battlefield'|'spell'
-  // domains：从多选 checkbox 收集（只在 card_type 为普通牌时有效）
-  const domains   = card_type === 'legend' || card_type === 'battlefield'
-    ? []
-    : Array.from(document.querySelectorAll('#inDomains input:checked')).map(el => el.value);
-
-  if (!name) { toast('请填入卡牌名称'); return; }
-  if (card_type !== 'legend' && card_type !== 'battlefield' && domains.length === 0) {
-    toast('请至少选择一个特性，或选择传奇 / 战场类型'); return;
-  }
-  if (allCards.find(c => c.name === name)) { toast('该卡牌已存在'); return; }
-
-  const card = {
-    id: uid(), name, img, pos: allCards.length,
-    set_code: '', card_number: null, card_type, domains,
-  };
-  allCards.push(card);
-  document.getElementById('inName').value = '';
-  document.getElementById('inImg').value  = '';
-  // 重置分类选择
-  document.getElementById('inCardType').value = '';
-  document.querySelectorAll('#inDomains input').forEach(el => el.checked = false);
-  onCardTypeChange();
-  renderAll();
-  setSyncState('syncing', '同步中…');
-  try {
-    await sbUpsert('cards', {
-      id: card.id, name: card.name, img: card.img || null,
-      pos: card.pos, set_code: null, card_number: null,
-      card_type: card.card_type || null,
-      domains: card.domains.length ? card.domains : null,
-    });
-    setSyncState('live', '已同步');
-    toast('已添加：' + name);
-  } catch(e) {
-    console.error('addCard error', e); setSyncState('err', '同步失败');
-  }
-}
-
-// 卡牌类型切换时显示/隐藏特性选择
-function onCardTypeChange() {
-  const t = document.getElementById('inCardType').value;
-  const domainRow = document.getElementById('inDomainsRow');
-  if (domainRow) domainRow.style.display =
-    (t === 'legend' || t === 'battlefield') ? 'none' : '';
-}
-
 async function delCard(id) {
   if (!confirm('确定删除此卡牌？此操作会从 Supabase 永久移除（含所有评级和备注）。')) return;
   allCards = allCards.filter(c => c.id !== id);
@@ -736,12 +598,9 @@ async function delCard(id) {
   renderAll();
   setSyncState('syncing', '同步中…');
   try {
-    // card_grades / card_notes 由外键 CASCADE DELETE 自动清除
     await sbFetch(`cards?id=eq.${encodeURIComponent(id)}`, 'DELETE');
     setSyncState('live', '已同步');
-  } catch(e) {
-    console.error('delCard error', e); setSyncState('err', '删除失败');
-  }
+  } catch(e) { console.error('delCard error', e); setSyncState('err', '删除失败'); }
 }
 
 async function setGrade(id, grade) {
@@ -789,9 +648,7 @@ async function saveGrade(cardId) {
       }, 'card_id,user_id,format');
     }
     setSyncState('live', '已同步');
-  } catch(e) {
-    console.error('saveGrade error', e); setSyncState('err', '同步失败');
-  }
+  } catch(e) { console.error('saveGrade error', e); setSyncState('err', '同步失败'); }
 }
 
 async function saveNote(cardId) {
@@ -807,32 +664,7 @@ async function saveNote(cardId) {
       await sbUpsert('card_notes', { card_id: cardId, user_id: currentUser.id, note: entry.note }, 'card_id,user_id');
     }
     setSyncState('live', '已同步');
-  } catch(e) {
-    console.error('saveNote error', e); setSyncState('err', '同步失败');
-  }
-}
-
-async function saveCardMeta(card) {
-  setSyncState('syncing', '同步中…');
-  try {
-    await sbUpsert('cards', {
-      id: card.id, name: card.name, img: card.img || null, pos: card.pos,
-      set_code: card.set_code || null, card_number: card.card_number ?? null,
-      card_type: card.card_type || null,
-      domains: card.domains?.length ? card.domains : null,
-    });
-    setSyncState('live', '已同步');
-  } catch(e) {
-    console.error('saveCardMeta error', e); setSyncState('err', '同步失败');
-  }
-}
-
-async function editImg(id) {
-  const c = allCards.find(c => c.id === id);
-  if (!c) return;
-  const url = prompt(`为「${c.name}」设置图片 URL（留空清除）：`, c.img || '');
-  if (url === null) return;
-  c.img = url.trim(); renderCards(); await saveCardMeta(c);
+  } catch(e) { console.error('saveNote error', e); setSyncState('err', '同步失败'); }
 }
 
 async function editName(id, el) {
@@ -844,7 +676,14 @@ async function editName(id, el) {
   el.replaceWith(inp); inp.focus(); inp.select();
   const commit = async () => {
     const v = inp.value.trim();
-    if (v && v !== c.name) { c.name = v; await saveCardMeta(c); }
+    if (v && v !== c.name) {
+      c.name = v;
+      setSyncState('syncing', '同步中…');
+      try {
+        await sbUpsert('cards', { id: c.id, name: c.name });
+        setSyncState('live', '已同步');
+      } catch(e) { setSyncState('err', '同步失败'); }
+    }
     renderAll();
   };
   inp.addEventListener('blur', commit);
@@ -868,9 +707,7 @@ async function clearTab() {
     await sbFetch(`cards?id=in.(${ids.map(i => encodeURIComponent(i)).join(',')})`, 'DELETE');
     setSyncState('live', '已同步');
     toast(`已清空 ${ids.length} 张卡牌`);
-  } catch(e) {
-    console.error('clearTab error', e); setSyncState('err', '清空失败');
-  }
+  } catch(e) { console.error('clearTab error', e); setSyncState('err', '清空失败'); }
 }
 
 function findCard(id) { return allCards.find(c => c.id === id); }
@@ -887,79 +724,69 @@ function switchFormat(fmt) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  IMPORT
+//  IMPORT（仅 JSON 模式，读 scraper 输出格式）
 // ═══════════════════════════════════════════════════════════
-let importMode = 'json';
-
 function openImport()  { document.getElementById('importOv').classList.add('open'); }
 function closeImport() { document.getElementById('importOv').classList.remove('open'); }
-
-function switchImportMode(mode) {
-  importMode = mode;
-  document.getElementById('iModeJson').classList.toggle('active', mode === 'json');
-  document.getElementById('iModeText').classList.toggle('active', mode === 'text');
-  document.getElementById('iPanelJson').classList.toggle('active', mode === 'json');
-  document.getElementById('iPanelText').classList.toggle('active', mode === 'text');
-}
-
 function previewJson() { document.getElementById('jsonResult').style.display = 'none'; }
 
 async function doJsonImport() {
   const file = document.getElementById('jsonFile').files[0];
   const res  = document.getElementById('jsonResult');
   if (!file) { toast('请先选择 JSON 文件'); return; }
-  let parsed;
-  try { parsed = JSON.parse(await file.text()); }
-  catch {
+  let items;
+  try {
+    const parsed = JSON.parse(await file.text());
+    items = Array.isArray(parsed) ? parsed : [];
+  } catch {
     res.textContent = '❌ JSON 格式错误';
     res.className = 'import-result err'; res.style.display = 'block'; return;
   }
+  if (!items.length) {
+    res.textContent = '❌ 未找到卡牌数据（需要 scraper 输出的平铺数组格式）';
+    res.className = 'import-result err'; res.style.display = 'block'; return;
+  }
 
-  // 支持：[{name,img,card_type,domains,...}] 或 { anyKey: [{...}] }
   let total = 0, skipped = 0, added = 0;
   const newCards = [];
 
-  const importItems = (items) => {
-    for (const item of items) {
-      const cardName = item.name?.trim();
-      if (!cardName) continue;
-      total++;
-      if (allCards.find(c => c.name === cardName)) { skipped++; continue; }
-      const card = {
-        id: uid(), name: cardName, img: item.img || '', pos: allCards.length + added,
-        set_code:    item.set_code    || '',
-        card_number: (() => {
-          // 支持两种格式：
-          // "UNL-219"：字母前缀须与 set_code 一致，只取数字部分
-          // 纯数字 219：直接使用
-          const raw = item.card_number;
-          if (raw == null) return null;
-          const m = String(raw).match(/^([A-Z]+)-(\d+)$/);
-          if (m) return m[1] === (item.set_code || '').trim() ? parseInt(m[2], 10) : null;
-          const n = parseInt(raw, 10);
-          return isNaN(n) ? null : n;
-        })(),
-        card_type:   item.card_type   || '',
-        domains:     Array.isArray(item.domains) ? item.domains : [],
-      };
-      allCards.push(card); newCards.push(card); added++;
-    }
-  };
+  for (const item of items) {
+    if (!item.cardNo) continue;
+    total++;
+    // 以 cardNo 为去重键（唯一标识一张卡）
+    if (allCards.find(c => c.cardNo === item.cardNo)) { skipped++; continue; }
 
-  if (Array.isArray(parsed)) { importItems(parsed); }
-  else { for (const items of Object.values(parsed)) { if (Array.isArray(items)) importItems(items); } }
+    // name：cardName + subTitle 拼接
+    const name = item.subTitle ? `${item.cardName}·${item.subTitle}` : (item.cardName || '');
 
+    const card = {
+      id:            uid(),
+      name,
+      frontImage:    item.frontImage  || '',
+      setCode:       item.set_code    || '',
+      cardNo:        item.cardNo,
+      cardCategory:  item.cardCategory || '',
+      cardColorList: Array.isArray(item.cardColorList) ? item.cardColorList : [],
+      pos:           item.listSort ?? (allCards.length + added),
+    };
+    allCards.push(card); newCards.push(card); added++;
+  }
+
+  allCards.sort((a, b) => a.pos - b.pos);
   renderAll();
 
   if (newCards.length) {
     setSyncState('syncing', '同步中…');
     try {
       const rows = newCards.map(c => ({
-        id: c.id, name: c.name, img: c.img || null, pos: c.pos,
-        set_code: c.set_code || null, card_number: c.card_number ?? null,
-        card_type: c.card_type || null, domains: c.domains?.length ? c.domains : null,
+        id: c.id, name: c.name, frontImage: c.frontImage || null,
+        setCode: c.setCode || null, cardNo: c.cardNo,
+        cardCategory: c.cardCategory || null,
+        cardColorList: c.cardColorList.length ? c.cardColorList : null,
+        pos: c.pos,
       }));
-      for (let i = 0; i < rows.length; i += 200) await sbUpsert('cards', rows.slice(i, i + 200));
+      // cardNo 作为 upsert conflict key
+      for (let i = 0; i < rows.length; i += 200) await sbUpsert('cards', rows.slice(i, i + 200), 'cardNo');
       setSyncState('live', '已同步');
     } catch(e) { console.error('import error', e); setSyncState('err', '同步失败'); }
   }
@@ -967,39 +794,6 @@ async function doJsonImport() {
   res.textContent = `✓ 成功导入 ${added} 张，跳过重复 ${skipped} 张（共 ${total} 张）`;
   res.className = 'import-result'; res.style.display = 'block';
   toast(`导入完成：+${added} 张`);
-}
-
-async function doBulkImport() {
-  const lines = document.getElementById('bulkTxt').value.split('\n').filter(l => l.trim());
-  const newCards = [];
-  let added = 0;
-  for (const line of lines) {
-    const t = line.trim();
-    let name, img;
-    if (t.includes('|'))                                           { [name, img] = t.split('|').map(s => s.trim()); }
-    else if (t.startsWith('http://') || t.startsWith('https://')) { img = t; name = ''; }
-    else                                                           { name = t; img = ''; }
-    const cardName = name || `卡牌 #${allCards.length + added + 1}`;
-    if (allCards.find(c => c.name === cardName)) continue;
-    const card = {
-      id: uid(), name: cardName, img: img || '', pos: allCards.length + added,
-      set_code: '', card_number: null, card_type: '', domains: [],
-    };
-    allCards.push(card); newCards.push(card); added++;
-  }
-  document.getElementById('bulkTxt').value = '';
-  closeImport(); renderAll();
-  if (newCards.length) {
-    setSyncState('syncing', '同步中…');
-    try {
-      await sbUpsert('cards', newCards.map(c => ({
-        id: c.id, name: c.name, img: c.img || null, pos: c.pos,
-        set_code: null, card_number: null, card_type: null, domains: null,
-      })));
-      setSyncState('live', '已同步');
-    } catch(e) { setSyncState('err', '同步失败'); }
-  }
-  toast(`已导入 ${added} 张卡牌`);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1018,10 +812,7 @@ function startCompare() {
   const area = document.getElementById('cmpArea');
   area.style.display = 'flex';
 
-  // 有该赛制评级的用户
-  const participants = allUsers.filter(u =>
-    allCards.some(c => grades[c.id]?.[u.id]?.[fmt]?.grade)
-  );
+  const participants = allUsers.filter(u => allCards.some(c => grades[c.id]?.[u.id]?.[fmt]?.grade));
   if (!participants.length) {
     area.innerHTML = `<div style="padding:40px;color:var(--text-dim);text-align:center">
       暂无「${fmt === 'constructed' ? '构筑' : '限制'}赛」评级数据<br><br>
@@ -1030,8 +821,8 @@ function startCompare() {
     return;
   }
 
-  const colW      = Math.max(60, Math.floor(380 / participants.length));
-  const gridCols  = `165px ${participants.map(() => colW + 'px').join(' ')}`;
+  const colW     = Math.max(60, Math.floor(380 / participants.length));
+  const gridCols = `165px ${participants.map(() => colW + 'px').join(' ')}`;
 
   let html = `<div style="display:flex;justify-content:space-between;align-items:center">
     <div style="font-family:'Cinzel',serif;font-size:14px;color:var(--gold-light);letter-spacing:.1em">
@@ -1044,18 +835,15 @@ function startCompare() {
     const tabCards = getCardsForTab(tab.id, allCards);
     const rated    = tabCards.filter(c => participants.some(u => grades[c.id]?.[u.id]?.[fmt]?.grade));
     if (!rated.length) continue;
-
     html += `<div>
       <div class="cmp-tab-label" style="color:${tab.color}">${tab.label}</div>
       <div class="cmp-head" style="grid-template-columns:${gridCols}">
         <div>卡牌</div>
         ${participants.map(u => `<div class="cmp-hl">${u.display_name}</div>`).join('')}
       </div>`;
-
     for (const c of rated) {
       const userGrades = participants.map(u => grades[c.id]?.[u.id]?.[fmt]?.grade || null);
-      const uniq = new Set(userGrades.filter(Boolean));
-      const diff = uniq.size > 1;
+      const diff = new Set(userGrades.filter(Boolean)).size > 1;
       html += `<div class="cmp-row ${diff ? 'diff' : ''}" style="grid-template-columns:${gridCols}">
         <div class="cmp-name">
           ${diff ? '<span class="diff-ico">⚡</span>' : '<span style="width:14px;display:inline-block"></span>'}
@@ -1076,7 +864,6 @@ function startCompare() {
     }
     html += `</div>`;
   }
-
   area.innerHTML = html;
 }
 
@@ -1093,7 +880,6 @@ function renderAll() {
   renderCards(); renderStats(); renderProgress();
 }
 
-// ── 评级说明（按赛制动态切换）────────────────────────────────
 function renderLegend() {
   const panel = document.getElementById('legendPanel');
   if (!panel) return;
@@ -1121,20 +907,22 @@ function renderTabs() {
 }
 
 function switchTab(id) {
-  activeTab = id; activeFilter = 'ALL'; searchQuery = '';
+  activeTab = id; activeFilter = 'ALL';
+  searchQuery = '';
   const sb = document.getElementById('searchBox');
   if (sb) sb.value = '';
   renderAll();
 }
 
-// ── Filter bar ───────────────────────────────────────────────
+// ── Filter bar（评级筛选 + 系列筛选 + 搜索）────────────────────
 function renderFilter() {
-  const items = [
+  // 评级筛选
+  const gradeItems = [
     { k:'ALL',  label:'全部' },
     ...G.map(g => ({ k:g, label:g, grade:true })),
     { k:'NONE', label:'未评' },
   ];
-  const filters = items.map(i => {
+  const gradeFilters = gradeItems.map(i => {
     const isG = !!i.grade, isActive = activeFilter === i.k;
     const style = isG
       ? `background:${GC[i.k]};color:${GF[i.k]};${isActive ? '' : 'opacity:.42'};border-color:${GC[i.k]}`
@@ -1143,20 +931,36 @@ function renderFilter() {
       style="${style}" onclick="setFilter('${i.k}')">${i.label}</div>`;
   }).join('');
 
+  // 系列筛选：取当前 tab 中实际存在的系列，仅有一个时不显示
+  const tabCards   = getCardsForTab(activeTab, allCards);
+  const activeSets = [...new Set(tabCards.map(c => c.setCode).filter(Boolean))].sort();
+  const setFilterRow = activeSets.length > 1
+    ? `<div class="fc-set-row">
+        <div class="fc fc-all ${activeSetFilter === 'ALL' ? 'active' : ''}"
+          onclick="setSetFilter('ALL')">全部系列</div>
+        ${activeSets.map(code => `
+          <div class="fc fc-all ${activeSetFilter === code ? 'active' : ''}"
+            onclick="setSetFilter('${code}')">${sets[code] || code}</div>
+        `).join('')}
+      </div>`
+    : '';
+
   const cnt   = filteredCards().length;
-  const total = getCardsForTab(activeTab, allCards).length;
+  const total = tabCards.length;
   const countLabel = cnt < total ? `<span class="card-count">${cnt} / ${total}</span>` : '';
 
   document.getElementById('filterRow').innerHTML =
-    filters + countLabel +
-    `<div class="fc-search">
-      <span class="fc-search-ico">🔍</span>
-      <input id="searchBox" type="text" placeholder="搜索…" value="${searchQuery}"
-        oninput="onSearch(this.value)" />
-    </div>`;
+    `<div class="fc-grade-row">${gradeFilters}${countLabel}
+      <div class="fc-search">
+        <span class="fc-search-ico">🔍</span>
+        <input id="searchBox" type="text" placeholder="搜索…" value="${searchQuery}"
+          oninput="onSearch(this.value)" />
+      </div>
+    </div>` + setFilterRow;
 }
 
-function setFilter(f) { activeFilter = f; renderFilter(); renderCards(); }
+function setFilter(f)    { activeFilter = f;    renderFilter(); renderCards(); }
+function setSetFilter(s) { activeSetFilter = s; renderFilter(); renderCards(); }
 
 function onSearch(v) {
   searchQuery = v.trim(); renderCards();
@@ -1168,8 +972,12 @@ function onSearch(v) {
 
 function filteredCards() {
   let list = getCardsForTab(activeTab, allCards);
+  // 系列筛选（全局跨 tab 共用）
+  if (activeSetFilter !== 'ALL') list = list.filter(c => c.setCode === activeSetFilter);
+  // 评级筛选
   if (activeFilter === 'NONE')      list = list.filter(c => !myGrade(c.id));
   else if (activeFilter !== 'ALL')  list = list.filter(c => myGrade(c.id) === activeFilter);
+  // 搜索
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     list = list.filter(c => c.name.toLowerCase().includes(q));
@@ -1186,7 +994,7 @@ function renderCards() {
   if (!cards.length) {
     const tabTotal = getCardsForTab(activeTab, allCards).length;
     const msg = tabTotal === 0
-      ? '此页还没有卡牌<br>在左侧手动添加，或使用「导入卡牌」'
+      ? '此页还没有卡牌，使用「导入卡牌」批量添加'
       : '此筛选下无卡牌';
     grid.innerHTML = `<div class="empty"><div class="empty-ico">🃏</div><div class="empty-txt">${msg}</div></div>`;
     return;
@@ -1199,21 +1007,25 @@ function renderCards() {
     const gc      = grade ? GC[grade] : null;
     const gf      = grade ? GF[grade] : null;
 
-    // 卡牌编号 + 特性标签
-    const numTag = (c.set_code && c.card_number != null)
-      ? `<span class="ci-tag card-num">${c.set_code}-${c.card_number}</span>` : '';
-    const domainTags = (c.domains || []).map(d =>
-      `<span class="ci-tag domain" style="--dt:${DOMAIN_COLOR[d] || 'var(--text-dim)'}">${d}</span>`
-    ).join('');
-    const metaHtml = (numTag || domainTags)
-      ? `<div class="ci-meta">${numTag}${domainTags}</div>` : '';
+    // 编号：截掉 /total，只显示 UNL-001
+    const displayNo = c.cardNo ? c.cardNo.replace(/\/\d+$/, '') : '';
+    const noTag = displayNo ? `<span class="ci-tag card-num">${displayNo}</span>` : '';
+
+    // 颜色标签（colorless 无对应中文名，自动跳过）
+    const colorTags = (c.cardColorList || [])
+      .filter(col => COLOR_HEX[col])
+      .map(col => `<span class="ci-tag color-tag" style="--ct:${COLOR_HEX[col]}">${COLOR_LABEL[col]}</span>`)
+      .join('');
+
+    const metaHtml = (noTag || colorTags)
+      ? `<div class="ci-meta">${noTag}${colorTags}</div>` : '';
 
     return `<div class="ci" ${gc ? `data-g="${grade}" style="--gc:${gc}"` : ''}
-      ondblclick="editImg('${c.id}')" title="单击放大卡图 · 双击修改图片 URL">
+      title="单击放大卡图">
       <button class="ci-del" onclick="delCard('${c.id}')">×</button>
       <div class="ci-thumb">
-        ${c.img
-          ? `<img src="${c.img}" alt="${c.name}" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in"
+        ${c.frontImage
+          ? `<img src="${c.frontImage}" alt="${c.name}" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in"
                onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
              <div class="ci-ph" style="display:none" onclick="openLightbox(event,'${c.id}')" style="cursor:zoom-in">
                <div class="ci-ph-ico">🃏</div><div class="ci-ph-name">${c.name}</div>
@@ -1243,7 +1055,6 @@ function renderCards() {
   }).join('');
 }
 
-// 构建他人评级角标
 function buildPeerBadges(cardId) {
   const others = allUsers.filter(u => u.id !== currentUser?.id);
   const badges = others.map(u => {
@@ -1263,7 +1074,6 @@ function renderStats() {
   const tabCards = getCardsForTab(activeTab, allCards);
   if (!tabCards.length) { sec.innerHTML = ''; return; }
   const total = tabCards.length;
-  // 5列网格：S A B C D
   const cells = G.map(g => {
     const n = tabCards.filter(c => myGrade(c.id) === g).length;
     return `<div class="st-cell">
@@ -1322,25 +1132,20 @@ function toast(msg) {
 // ═══════════════════════════════════════════════════════════
 //  KEY BINDINGS
 // ═══════════════════════════════════════════════════════════
-document.getElementById('inName').addEventListener('keydown', e => { if (e.key === 'Enter') addCard(); });
 document.getElementById('importOv').addEventListener('click', e => { if (e.target === e.currentTarget) closeImport(); });
 document.getElementById('cmpOv').addEventListener('click',   e => { if (e.target === e.currentTarget) closeCmp(); });
 document.getElementById('statsOv').addEventListener('click', e => { if (e.target === e.currentTarget) closeStats(); });
 
-// S/A/B/C/D/E → 评级聚焦卡 | Escape → 取消 | ← → → 导航
 document.addEventListener('keydown', e => {
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (document.querySelector('.overlay.open')) return;
   if (!e.key) return;
   const key = e.key.toUpperCase();
-  if (G.includes(key) && focusedCardId) {
-    e.preventDefault(); setGrade(focusedCardId, key); return;
-  }
+  if (G.includes(key) && focusedCardId) { e.preventDefault(); setGrade(focusedCardId, key); return; }
   if (e.key === 'Escape' && focusedCardId) {
-    // 取消当前聚焦卡评级
     const current = myGrade(focusedCardId);
-    if (current) setGrade(focusedCardId, current);  // toggle off
+    if (current) setGrade(focusedCardId, current);
     return;
   }
   if (e.key === 'Escape') { closeLightbox(); return; }
@@ -1377,8 +1182,9 @@ document.getElementById('cardGrid').addEventListener('click', e => {
   }
 });
 
-// ── Lightbox ──────────────────────────────────────────────────
-// 当前 lightbox 正在展示的卡牌 id
+// ═══════════════════════════════════════════════════════════
+//  LIGHTBOX
+// ═══════════════════════════════════════════════════════════
 let lbCardId = null;
 
 function openLightbox(evt, id) {
@@ -1388,8 +1194,8 @@ function openLightbox(evt, id) {
   lbCardId = id;
 
   const content = document.getElementById('lbContent');
-  if (c.img) {
-    content.innerHTML = `<img class="lb-img" src="${c.img}" alt="${c.name}"
+  if (c.frontImage) {
+    content.innerHTML = `<img class="lb-img" src="${c.frontImage}" alt="${c.name}"
       onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="lb-ph" style="display:none"><div class="lb-ph-ico">🃏</div></div>`;
   } else {
@@ -1398,105 +1204,28 @@ function openLightbox(evt, id) {
 
   document.getElementById('lbName').textContent = c.name;
   refreshLbMeta(c);
-  populateLbEdit(c);
-
-  // 收起编辑面板（每次重新打开时重置）
-  document.getElementById('lbEditPanel').style.display = 'none';
-  document.getElementById('lbEditToggle') && (document.querySelector('.lb-edit-toggle').textContent = '✏ 编辑详情');
-
   document.getElementById('lightbox').classList.add('open');
 }
 
-// 刷新 lightbox meta 标签（编辑保存后调用）
 function refreshLbMeta(c) {
-  const setName = c.set_code ? (sets[c.set_code] ? `${sets[c.set_code]}（${c.set_code}）` : c.set_code) : '';
-  const numTag  = (c.set_code && c.card_number != null)
-    ? `<span class="ci-tag card-num">${c.set_code}-${c.card_number}</span>` : '';
+  // 编号：截掉 /total
+  const displayNo = c.cardNo ? c.cardNo.replace(/\/\d+$/, '') : '';
+  const noTag  = displayNo ? `<span class="ci-tag card-num">${displayNo}</span>` : '';
+  // 系列
+  const setName = c.setCode ? (sets[c.setCode] ? `${sets[c.setCode]}（${c.setCode}）` : c.setCode) : '';
   const setTag  = setName ? `<span class="ci-tag">${setName}</span>` : '';
-  const domTags = (c.domains || []).map(d =>
-    `<span class="ci-tag domain" style="--dt:${DOMAIN_COLOR[d] || 'var(--text-dim)'}">${d}</span>`
-  ).join('');
-  document.getElementById('lbMeta').innerHTML = numTag + setTag + domTags;
-}
-
-// 填充编辑面板的表单值
-function populateLbEdit(c) {
-  // 系列下拉：动态填充当前 sets 表
-  const setSelect = document.getElementById('lbSetCode');
-  setSelect.innerHTML = '<option value="">— 无 —</option>' +
-    Object.entries(sets).sort().map(([code, name]) =>
-      `<option value="${code}" ${c.set_code === code ? 'selected' : ''}>${code} · ${name}</option>`
-    ).join('');
-
-  // 编号
-  const numInput = document.getElementById('lbCardNumber');
-  numInput.value = c.card_number != null ? c.card_number : '';
-
-  // 类型
-  document.getElementById('lbCardType').value = c.card_type || '';
-
-  // 特性 checkbox
-  const domainCbs = document.querySelectorAll('#lbDomains input[type=checkbox]');
-  domainCbs.forEach(cb => { cb.checked = (c.domains || []).includes(cb.value); });
-
-  // 特性行显隐：legend/battlefield 隐藏
-  const hideD = c.card_type === 'legend' || c.card_type === 'battlefield';
-  document.getElementById('lbDomainsRow').style.display = hideD ? 'none' : '';
+  // 颜色标签
+  const colorTags = (c.cardColorList || [])
+    .filter(col => COLOR_HEX[col])
+    .map(col => `<span class="ci-tag color-tag" style="--ct:${COLOR_HEX[col]}">${COLOR_LABEL[col]}</span>`)
+    .join('');
+  document.getElementById('lbMeta').innerHTML = noTag + setTag + colorTags;
 }
 
 function closeLightbox(evt) {
   if (evt && evt.target !== evt.currentTarget && !evt.target.classList.contains('lb-close')) return;
   document.getElementById('lightbox').classList.remove('open');
   lbCardId = null;
-}
-
-// ═══════════════════════════════════════════════════════════
-//  LIGHTBOX CARD EDIT
-// ═══════════════════════════════════════════════════════════
-function toggleLbEdit() {
-  const panel  = document.getElementById('lbEditPanel');
-  const btn    = document.querySelector('.lb-edit-toggle');
-  const hidden = panel.style.display === 'none';
-  panel.style.display = hidden ? '' : 'none';
-  btn.textContent = hidden ? '▲ 收起详情' : '✏ 编辑详情';
-}
-
-// 保存单个字段（set_code / card_number）
-async function lbSaveField(field, value) {
-  const c = findCard(lbCardId);
-  if (!c) return;
-  c[field] = value;
-  refreshLbMeta(c);
-  renderAll();
-  await saveCardMeta(c);
-}
-
-// 类型变更：同步更新特性行显隐
-async function lbSaveCardType(value) {
-  const c = findCard(lbCardId);
-  if (!c) return;
-  c.card_type = value;
-  // legend/battlefield 强制清空 domains
-  if (value === 'legend' || value === 'battlefield') {
-    c.domains = [];
-    document.querySelectorAll('#lbDomains input[type=checkbox]').forEach(cb => cb.checked = false);
-  }
-  document.getElementById('lbDomainsRow').style.display =
-    (value === 'legend' || value === 'battlefield') ? 'none' : '';
-  refreshLbMeta(c);
-  renderAll();
-  await saveCardMeta(c);
-}
-
-// 特性多选变更
-async function lbSaveDomains() {
-  const c = findCard(lbCardId);
-  if (!c) return;
-  c.domains = Array.from(document.querySelectorAll('#lbDomains input[type=checkbox]:checked'))
-    .map(cb => cb.value);
-  refreshLbMeta(c);
-  renderAll();
-  await saveCardMeta(c);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1511,10 +1240,7 @@ function openStats() {
   renderStatsModal();
   document.getElementById('statsOv').classList.add('open');
 }
-
-function closeStats() {
-  document.getElementById('statsOv').classList.remove('open');
-}
+function closeStats() { document.getElementById('statsOv').classList.remove('open'); }
 
 function switchStatsFormat(fmt) {
   statsFormat = fmt;
@@ -1526,11 +1252,7 @@ function switchStatsFormat(fmt) {
 function renderStatsModal() {
   const el = document.getElementById('statsContent');
   const fmt = statsFormat;
-
-  // 有该赛制评级的用户
-  const users = allUsers.filter(u =>
-    allCards.some(c => grades[c.id]?.[u.id]?.[fmt]?.grade)
-  );
+  const users = allUsers.filter(u => allCards.some(c => grades[c.id]?.[u.id]?.[fmt]?.grade));
 
   if (!users.length) {
     el.innerHTML = `<div class="stats-empty">暂无「${fmt === 'constructed' ? '构筑' : '限制'}赛」评级数据</div>`;
@@ -1538,23 +1260,17 @@ function renderStatsModal() {
   }
 
   let html = '';
-
-  // ── 区块一：当前 Tab 评级分布（横向堆叠条形图） ──
   const tabCards = getCardsForTab(activeTab, allCards);
   const tabLabel = TABS.find(t => t.id === activeTab)?.label || activeTab;
 
   if (tabCards.length) {
-    // 每位用户在当前 tab 的各档位数量
     const userStats = users.map(u => {
       const counts = {};
       G.forEach(g => { counts[g] = tabCards.filter(c => grades[c.id]?.[u.id]?.[fmt]?.grade === g).length; });
       counts.total = tabCards.filter(c => grades[c.id]?.[u.id]?.[fmt]?.grade).length;
       return { ...u, counts };
     });
-
     const maxTotal = Math.max(...userStats.map(u => u.counts.total), 1);
-
-    // 用户图例
     const USER_COLORS = ['#5b9fe0','#e07d30','#52b96e','#9b6de0','#d4b935','#e05252'];
     const legendHtml = users.map((u, i) =>
       `<div class="stats-legend-item">
@@ -1562,14 +1278,10 @@ function renderStatsModal() {
         ${u.display_name}
       </div>`
     ).join('');
-
-    // 每档位一行，每行各用户的条形
     const gridCols = `60px repeat(${users.length}, 1fr)`;
     const barsHtml = G.map(g => {
       const bars = userStats.map((u, i) => {
         const n = u.counts[g];
-        const pct = u.counts.total > 0 ? Math.round(n / u.counts.total * 100) : 0;
-        const color = USER_COLORS[i % USER_COLORS.length];
         const barPct = maxTotal > 0 ? Math.round(n / maxTotal * 100) : 0;
         const showInside = barPct >= 20;
         return `<div style="position:relative;height:20px;background:var(--border);border-radius:3px;overflow:visible;">
@@ -1587,7 +1299,6 @@ function renderStatsModal() {
         ${bars}
       </div>`;
     }).join('');
-
     html += `<div class="stats-section">
       <div class="stats-section-title">${tabLabel} · 档位分布（${fmt === 'constructed' ? '构筑' : '限制'}赛）</div>
       <div class="stats-chart">${barsHtml}</div>
@@ -1595,11 +1306,9 @@ function renderStatsModal() {
     </div>`;
   }
 
-  // ── 区块二：全局 Tab 概览表格 ──
   const overviewRows = TABS.map(tab => {
     const tc = getCardsForTab(tab.id, allCards);
     if (!tc.length) return '';
-    // 每位用户各档位数
     const cells = users.map(u => {
       const counts = G.map(g => {
         const n = tc.filter(c => grades[c.id]?.[u.id]?.[fmt]?.grade === g).length;
@@ -1608,16 +1317,9 @@ function renderStatsModal() {
           : `<div class="stats-ov-badge" style="background:var(--bg-input);color:var(--text-dim);opacity:.4">·</div>`;
       }).join('');
       const rated = tc.filter(c => grades[c.id]?.[u.id]?.[fmt]?.grade).length;
-      return `<td>
-        <div class="stats-ov-grades">${counts}</div>
-        <div class="stats-ov-total">${rated}/${tc.length}</div>
-      </td>`;
+      return `<td><div class="stats-ov-grades">${counts}</div><div class="stats-ov-total">${rated}/${tc.length}</div></td>`;
     }).join('');
-
-    return `<tr>
-      <td class="stats-ov-tab" style="color:${tab.color}">${tab.label}</td>
-      ${cells}
-    </tr>`;
+    return `<tr><td class="stats-ov-tab" style="color:${tab.color}">${tab.label}</td>${cells}</tr>`;
   }).filter(Boolean).join('');
 
   const headerCells = users.map(u => `<th>${u.display_name}</th>`).join('');
@@ -1631,17 +1333,6 @@ function renderStatsModal() {
 
   el.innerHTML = html;
 }
-
-// ═══════════════════════════════════════════════════════════
-//  SETS MANAGEMENT
-// ═══════════════════════════════════════════════════════════
-
-
-
-
-
-
-
 
 // ═══════════════════════════════════════════════════════════
 //  BOOT
