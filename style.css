@@ -334,20 +334,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .lightbox.open{display:flex;}
 .lb-inner{position:relative;max-width:min(480px,90vw);display:flex;flex-direction:column;align-items:center;gap:12px;}
 .lb-img{width:100%;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.8);display:block;}
-/* 战场牌 lightbox wrapper：仅用于占位，撑开与普通卡等高的空间（5:7 比例）
-   overflow:visible 保证旋转后超出部分不被裁切（实际上旋转后宽高刚好匹配，不会溢出） */
-.lb-bf-wrap{width:100%;aspect-ratio:5/7;position:relative;flex-shrink:0;}
-/* 战场牌原图横版（比例约 7:5）旋转逻辑：
-   - height 设为容器宽度 min(480px,90vw)，旋转后此值变为「视觉宽」，恰好填满 lb-inner
-   - width 由 aspect-ratio:7/5 自动推算为 height×7/5，旋转后变为「视觉高」= 普通卡图高
-   - translate(-50%,-50%) + absolute 居中，再旋转，视觉效果与普通卡完全一致 */
+/* 战场牌 wrapper：横版容器，比普通卡宽，高度较小（7:5 比例） */
+.lb-bf-wrap{width:100%;}
+/* 图片 7:5 横版，rotate(-90deg) 后视觉变为 5:7 竖版，与普通卡等大 */
 .lb-img--rotated{
-  position:absolute;top:50%;left:50%;
-  height:min(480px,90vw);width:auto;aspect-ratio:7/5;
-  transform:translate(-50%,-50%) rotate(-90deg);
-  transform-origin:center center;
+  width:100%;aspect-ratio:7/5;display:block;
+  transform:rotate(-90deg);
   border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.8);
-  display:block;
 }
 .lb-ph{width:100%;aspect-ratio:5/7;border-radius:12px;background:var(--bg-card);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-dim);}
