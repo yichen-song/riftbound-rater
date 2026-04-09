@@ -1000,7 +1000,7 @@ function filteredCards() {
     const q = searchQuery.toLowerCase();
     list = list.filter(c => c.name.toLowerCase().includes(q));
   }
-  // 排序：先按系列 sort_order 降序（key 越大越靠前），同系列内按用户选择
+  // 排序：先按系列 sort_order 降序（key 越大=越新，越靠前），同系列内按用户选择
   const setOrder = code => sets[code]?.sort_order ?? 0;
   const cardNum  = c => parseInt(c.cardNo?.match(/\d+/)?.[0] ?? '0', 10);
 
