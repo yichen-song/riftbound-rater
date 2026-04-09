@@ -256,6 +256,11 @@ async function doLogin() {
     if (!r.ok) throw new Error(data.error_description || data.msg || '登录失败');
     applySession(data);
     saveSession(data);
+    
+    // 设置定时刷新 (提前 2 分钟刷新)
+    const delay = ((data.expires_in ?? 3600) - 120) * 1000;
+    if (delay > 0) setTimeout(() => refreshSession(currentUser?.refresh_token), delay);
+    
     showMainScreen();
     setSyncState('syncing', '连接中…');
     showSkeleton();
@@ -345,6 +350,9 @@ async function restoreSession() {
   if (!saved.expires_at) return await refreshSession(saved.refresh_token);
   if (Date.now() < saved.expires_at - 60_000) {
     applySession({ ...saved, expires_in: Math.floor((saved.expires_at - Date.now()) / 1000) });
+    // 恢复 session 后设置定时刷新
+    const delay = saved.expires_at - Date.now() - 120_000;
+    if (delay > 0) setTimeout(() => refreshSession(currentUser?.refresh_token), delay);
     return true;
   }
   return await refreshSession(saved.refresh_token);
@@ -747,9 +755,25 @@ async function saveGrade(cardId) {
     window._pendingSaves.delete(saveKey);
     setSyncState('live', '已同步');
   } catch(e) { 
-    console.error('saveGrade error', e); 
+    console.error('saveGrade error', e);
+    // 检测 401 错误,可能是 token 过期
+    if (e.message.includes('401') || e.message.includes('JWT expired')) {
+      console.log('[auth] Token 过期,尝试刷新');
+      setSyncState('syncing', '刷新凭证…');
+      const refreshed = await refreshSession(currentUser?.refresh_token);
+      if (refreshed) {
+        // Token 刷新成功,重试保存
+        setTimeout(() => saveGrade(cardId), 500);
+        return;
+      } else {
+        // Token 刷新失败,需要重新登录
+        toast('登录已过期,请重新登录');
+        setTimeout(() => doLogout(), 2000);
+        return;
+      }
+    }
     setSyncState('err', '同步失败');
-    // 3 秒后自动重试
+    // 其他错误 3 秒后自动重试
     setTimeout(() => {
       if (window._pendingSaves.has(saveKey)) {
         console.log('[retry] 重试保存评级:', cardId);
@@ -780,9 +804,25 @@ async function saveNote(cardId) {
     window._pendingSaves.delete(saveKey);
     setSyncState('live', '已同步');
   } catch(e) { 
-    console.error('saveNote error', e); 
+    console.error('saveNote error', e);
+    // 检测 401 错误,可能是 token 过期
+    if (e.message.includes('401') || e.message.includes('JWT expired')) {
+      console.log('[auth] Token 过期,尝试刷新');
+      setSyncState('syncing', '刷新凭证…');
+      const refreshed = await refreshSession(currentUser?.refresh_token);
+      if (refreshed) {
+        // Token 刷新成功,重试保存
+        setTimeout(() => saveNote(cardId), 500);
+        return;
+      } else {
+        // Token 刷新失败,需要重新登录
+        toast('登录已过期,请重新登录');
+        setTimeout(() => doLogout(), 2000);
+        return;
+      }
+    }
     setSyncState('err', '同步失败');
-    // 3 秒后自动重试
+    // 其他错误 3 秒后自动重试
     setTimeout(() => {
       if (window._pendingSaves.has(saveKey)) {
         console.log('[retry] 重试保存备注:', cardId);
