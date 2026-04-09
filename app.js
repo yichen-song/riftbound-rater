@@ -152,6 +152,12 @@ function createRealtimeClient(supabaseUrl, apiKey) {
     ws.onclose = () => {
       clearInterval(heartbeatTimer);
       channels.forEach(ch => { if (ch._statusCallback) ch._statusCallback('CLOSED'); });
+      // WebSocket 意外关闭时自动重连
+      if (channels.length > 0) {
+        setTimeout(() => {
+          if (channels.length > 0) connect();
+        }, 3000);
+      }
     };
     ws.onerror = () => {
       channels.forEach(ch => { if (ch._statusCallback) ch._statusCallback('CHANNEL_ERROR'); });
@@ -363,6 +369,14 @@ async function refreshSession(refreshToken) {
       data.user.user_metadata = { ...data.user.user_metadata, display_name: knownName };
     }
     saveSession(data);
+    
+    // Token 刷新后重新订阅 Realtime (因为旧 token 可能导致连接失效)
+    if (realtimeChannel) {
+      realtimeChannel.unsubscribe();
+      realtimeChannel = null;
+      setTimeout(() => subscribeRealtime(), 1000);
+    }
+    
     const delay = ((data.expires_in ?? 3600) - 120) * 1000;
     if (delay > 0) setTimeout(() => refreshSession(currentUser?.refresh_token), delay);
     return true;
@@ -490,11 +504,26 @@ function subscribeRealtime() {
   ch.subscribe(status => {
     if (status === 'SUBSCRIBED') {
       setSyncState('live', '实时同步'); realtimeChannel = ch;
+      // 重连成功后,检查并重试所有未保存的数据
+      if (window._pendingSaves && window._pendingSaves.size > 0) {
+        console.log('[reconnect] 检测到未保存数据,开始重试:', window._pendingSaves.size);
+        const pending = Array.from(window._pendingSaves);
+        pending.forEach(key => {
+          const [type, cardId] = key.split(':');
+          if (type === 'grade') {
+            setTimeout(() => saveGrade(cardId), 500);
+          } else if (type === 'note') {
+            setTimeout(() => saveNote(cardId), 500);
+          }
+        });
+      }
     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
       setSyncState('err', '连接断开');
       setTimeout(() => { setSyncState('syncing', '重连中…'); ch.unsubscribe(); subscribeRealtime(); }, 5000);
     } else if (status === 'CLOSED') {
       setSyncState('err', '已断开');
+      // CLOSED 状态也尝试重连(可能是 token 过期或网络波动)
+      setTimeout(() => { setSyncState('syncing', '重连中…'); ch.unsubscribe(); subscribeRealtime(); }, 3000);
     }
   });
 }
@@ -697,6 +726,12 @@ function updateNote(id, val) {
 async function saveGrade(cardId) {
   const entry = grades[cardId]?.[currentUser.id]?.[activeFormat];
   setSyncState('syncing', '同步中…');
+  
+  // 记录待保存状态
+  if (!window._pendingSaves) window._pendingSaves = new Set();
+  const saveKey = `grade:${cardId}:${activeFormat}`;
+  window._pendingSaves.add(saveKey);
+  
   try {
     if (!entry || (!entry.grade && !entry.comment)) {
       await sbFetch(
@@ -709,13 +744,30 @@ async function saveGrade(cardId) {
         grade: entry.grade || null, comment: entry.comment || '',
       }, 'card_id,user_id,format');
     }
+    window._pendingSaves.delete(saveKey);
     setSyncState('live', '已同步');
-  } catch(e) { console.error('saveGrade error', e); setSyncState('err', '同步失败'); }
+  } catch(e) { 
+    console.error('saveGrade error', e); 
+    setSyncState('err', '同步失败');
+    // 3 秒后自动重试
+    setTimeout(() => {
+      if (window._pendingSaves.has(saveKey)) {
+        console.log('[retry] 重试保存评级:', cardId);
+        saveGrade(cardId);
+      }
+    }, 3000);
+  }
 }
 
 async function saveNote(cardId) {
   const entry = notes[cardId]?.[currentUser.id];
   setSyncState('syncing', '同步中…');
+  
+  // 记录待保存状态
+  if (!window._pendingSaves) window._pendingSaves = new Set();
+  const saveKey = `note:${cardId}`;
+  window._pendingSaves.add(saveKey);
+  
   try {
     if (!entry?.note) {
       await sbFetch(
@@ -725,8 +777,19 @@ async function saveNote(cardId) {
     } else {
       await sbUpsert('card_notes', { card_id: cardId, user_id: currentUser.id, note: entry.note }, 'card_id,user_id');
     }
+    window._pendingSaves.delete(saveKey);
     setSyncState('live', '已同步');
-  } catch(e) { console.error('saveNote error', e); setSyncState('err', '同步失败'); }
+  } catch(e) { 
+    console.error('saveNote error', e); 
+    setSyncState('err', '同步失败');
+    // 3 秒后自动重试
+    setTimeout(() => {
+      if (window._pendingSaves.has(saveKey)) {
+        console.log('[retry] 重试保存备注:', cardId);
+        saveNote(cardId);
+      }
+    }, 3000);
+  }
 }
 
 
@@ -1415,6 +1478,49 @@ function renderStatsModal() {
 
   el.innerHTML = html;
 }
+
+// ═══════════════════════════════════════════════════════════
+//  PAGE VISIBILITY & KEEPALIVE
+// ═══════════════════════════════════════════════════════════
+// 页面关闭前检查未保存数据
+window.addEventListener('beforeunload', (e) => {
+  if (window._pendingSaves && window._pendingSaves.size > 0) {
+    e.preventDefault();
+    e.returnValue = '您有未保存的评语或备注,确定要离开吗?';
+    return e.returnValue;
+  }
+});
+
+// 页面从隐藏到可见时,检查连接状态并重连
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && currentUser && realtimeChannel) {
+    // 页面重新可见,检查 WebSocket 状态
+    setTimeout(() => {
+      // 如果状态不是 live,说明可能在休眠期间断开了
+      const dot = document.getElementById('syncDot');
+      if (!dot?.classList.contains('live')) {
+        setSyncState('syncing', '重连中…');
+        realtimeChannel?.unsubscribe();
+        realtimeChannel = null;
+        subscribeRealtime();
+      }
+    }, 1000);
+  }
+});
+
+// 定期检查连接健康度(每分钟)
+setInterval(() => {
+  if (!currentUser) return;
+  const dot = document.getElementById('syncDot');
+  // 如果显示"已断开"或"连接断开"超过 30 秒,尝试重连
+  if (dot?.classList.contains('err') && realtimeChannel) {
+    console.log('[keepalive] 检测到长时间断开,尝试重连');
+    setSyncState('syncing', '重连中…');
+    realtimeChannel.unsubscribe();
+    realtimeChannel = null;
+    subscribeRealtime();
+  }
+}, 60000);
 
 // ═══════════════════════════════════════════════════════════
 //  BOOT
