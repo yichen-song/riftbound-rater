@@ -919,34 +919,31 @@ function renderFilter() {
           <div class="fc fc-all ${activeSetFilter === code ? 'active' : ''}"
             onclick="setSetFilter('${code}')">${sets[code]?.name || code}</div>
         `).join('')}
-        <select class="sort-select" onchange="setSort(this.value)">
-          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
-          <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
-          <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
-          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
-          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
-        </select>
       </div>`
-    : `<div class="fc-set-row">
-        <select class="sort-select" onchange="setSort(this.value)">
-          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
-          <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
-          <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
-          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
-          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
-        </select>
-      </div>`;
+    : '';
 
   const cnt   = filteredCards().length;
   const total = tabCards.length;
   const countLabel = cnt < total ? `<span class="card-count">${cnt} / ${total}</span>` : '';
 
+  // 排序选择框（移到搜索框右侧栏）
+  const sortSelect = `<select class="sort-select" onchange="setSort(this.value)">
+    <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
+    <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
+    <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
+    <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
+    <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
+  </select>`;
+
   document.getElementById('filterRow').innerHTML =
     `<div class="fc-grade-row">${gradeFilters}${countLabel}
-      <div class="fc-search">
-        <span class="fc-search-ico">🔍</span>
-        <input id="searchBox" type="text" placeholder="搜索…" value="${searchQuery}"
-          oninput="onSearch(this.value)" />
+      <div class="fc-right-col">
+        <div class="fc-search">
+          <span class="fc-search-ico">🔍</span>
+          <input id="searchBox" type="text" placeholder="搜索…" value="${searchQuery}"
+            oninput="onSearch(this.value)" />
+        </div>
+        ${sortSelect}
       </div>
     </div>` + setFilterRow;
 }
