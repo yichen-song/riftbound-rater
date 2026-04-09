@@ -17,7 +17,8 @@ body::before{content:'';position:fixed;inset:0;background:
   radial-gradient(ellipse 35% 55% at 2% 55%,rgba(91,159,224,.04) 0%,transparent 50%),
   radial-gradient(ellipse 35% 55% at 98% 55%,rgba(192,57,43,.04) 0%,transparent 50%);
   pointer-events:none;z-index:0;}
-.app{position:relative;z-index:1;}
+.app{position:relative;z-index:1;zoom:1.15;}
+
 
 /* ═══════════════════════════════════════════════════════════
    AUTH SCREEN
@@ -207,7 +208,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 /* Card body */
 .ci-body{padding:9px 10px 10px;}
 .ci-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:4px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;}
 
 /* Card meta */
 .ci-meta{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;min-height:0;}
@@ -333,7 +334,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .lightbox.open{display:flex;}
 .lb-inner{position:relative;max-width:min(480px,90vw);display:flex;flex-direction:column;align-items:center;gap:12px;}
 .lb-img{width:100%;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.8);display:block;}
-.lb-img--rotated{transform:rotate(-90deg);width:min(67vw,calc(480px * 7/5));border-radius:12px;}
+/* 战场卡横版，逆时针旋转 90°，限制高度避免挤压下方文字 */
+.lb-img--rotated{transform:rotate(-90deg);width:auto;height:min(260px,38vh);}
 .lb-ph{width:100%;aspect-ratio:5/7;border-radius:12px;background:var(--bg-card);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-dim);}
 .lb-ph-ico{font-size:56px;opacity:.15;}
