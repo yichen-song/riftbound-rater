@@ -364,7 +364,7 @@ async function sbDelete(path) {
 
 // ═══ 系列管理 ═══
 async function loadSets() {
-  sets = await sbGet('sets?order=sort_order.desc,code');
+  sets = await sbGet('sets?order=sort_order.asc,code');
   renderSetCfgTable();
   renderSetList();
 }
@@ -508,7 +508,7 @@ async function saveSetOrder() {
   const total = rows.length;
   const updates = rows.map((row, i) => ({
     code: row.dataset.code,
-    sort_order: total - i,  // 第一行得到最大值
+    sort_order: i + 1,  // 第一行得到最小值 1
   }));
   try {
     // 逐条 PATCH（sets 无复合主键，PostgREST 不支持批量 upsert by non-pk）
