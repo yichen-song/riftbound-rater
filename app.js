@@ -85,7 +85,7 @@ let activeTab       = 'legends';
 let activeFormat    = 'constructed';  // 'constructed' | 'limited'
 let activeFilter    = 'ALL';          // 'ALL' | 'S'..'D' | 'NONE'
 let activeSetFilter = 'ALL';          // 'ALL' | setCode，全局跨 tab 共用，切 tab 不重置
-let activeSort      = 'no-desc';      // 'no-desc' | 'no-asc' | 'name-asc' | 'name-desc' | 'pos'
+let activeSort      = 'pos';          // 'pos' | 'name-asc' | 'name-desc' | 'no-asc' | 'no-desc'
 let searchQuery     = '';
 let commentTimer    = null;
 let noteTimer       = null;
@@ -423,7 +423,8 @@ function applyCards(rows) {
 
 function applySets(rows) {
   sets = {};
-  for (const r of rows) sets[r.code] = r.name;
+  // sets[code] = { name, sort_order }
+  for (const r of rows) sets[r.code] = { name: r.name, sort_order: r.sort_order ?? 0 };
 }
 
 function applyGrades(rows) {
@@ -941,23 +942,23 @@ function renderFilter() {
           onclick="setSetFilter('ALL')">全部系列</div>
         ${activeSets.map(code => `
           <div class="fc fc-all ${activeSetFilter === code ? 'active' : ''}"
-            onclick="setSetFilter('${code}')">${sets[code] || code}</div>
+            onclick="setSetFilter('${code}')">${sets[code]?.name || code}</div>
         `).join('')}
         <select class="sort-select" onchange="setSort(this.value)">
-          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
-          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
+          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
           <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
           <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
-          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>官网顺序</option>
+          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
+          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
         </select>
       </div>`
     : `<div class="fc-set-row">
         <select class="sort-select" onchange="setSort(this.value)">
-          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
-          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
+          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
           <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
           <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
-          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>官网顺序</option>
+          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
+          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
         </select>
       </div>`;
 
@@ -999,14 +1000,21 @@ function filteredCards() {
     const q = searchQuery.toLowerCase();
     list = list.filter(c => c.name.toLowerCase().includes(q));
   }
-  // 排序
-  if (activeSort === 'name-asc')  list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
-  else if (activeSort === 'name-desc') list = [...list].sort((a, b) => b.name.localeCompare(a.name, 'zh'));
-  else if (activeSort === 'no-asc' || activeSort === 'no-desc') {
-    const num = c => parseInt(c.cardNo?.match(/\d+/)?.[0] ?? '0', 10);
-    list = [...list].sort((a, b) => activeSort === 'no-asc' ? num(a) - num(b) : num(b) - num(a));
-  }
-  // activeSort === 'pos' 时保持 allCards 原顺序（已按 pos 加载）
+  // 排序：先按系列 sort_order 降序（key 越大越靠前），同系列内按用户选择
+  const setOrder = code => sets[code]?.sort_order ?? 0;
+  const cardNum  = c => parseInt(c.cardNo?.match(/\d+/)?.[0] ?? '0', 10);
+
+  list = [...list].sort((a, b) => {
+    // 第一键：系列 sort_order 降序
+    const sd = setOrder(b.setCode) - setOrder(a.setCode);
+    if (sd !== 0) return sd;
+    // 第二键：用户选择
+    if (activeSort === 'name-asc')  return a.name.localeCompare(b.name, 'zh');
+    if (activeSort === 'name-desc') return b.name.localeCompare(a.name, 'zh');
+    if (activeSort === 'no-asc')    return cardNum(a) - cardNum(b);
+    if (activeSort === 'no-desc')   return cardNum(b) - cardNum(a);
+    return a.pos - b.pos; // 'pos'：官网顺序
+  });
   return list;
 }
 
@@ -1237,7 +1245,7 @@ function refreshLbMeta(c) {
   const displayNo = c.cardNo ? c.cardNo.replace(/\/\d+$/, '') : '';
   const noTag  = displayNo ? `<span class="ci-tag card-num">${displayNo}</span>` : '';
   // 系列
-  const setName = c.setCode ? (sets[c.setCode] ? `${sets[c.setCode]}（${c.setCode}）` : c.setCode) : '';
+  const setName = c.setCode ? (sets[c.setCode] ? `${sets[c.setCode].name}（${c.setCode}）` : c.setCode) : '';
   const setTag  = setName ? `<span class="ci-tag">${setName}</span>` : '';
   // 颜色标签
   const colorTags = (c.cardColorList || [])
