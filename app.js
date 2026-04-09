@@ -85,6 +85,7 @@ let activeTab       = 'legends';
 let activeFormat    = 'constructed';  // 'constructed' | 'limited'
 let activeFilter    = 'ALL';          // 'ALL' | 'S'..'D' | 'NONE'
 let activeSetFilter = 'ALL';          // 'ALL' | setCode，全局跨 tab 共用，切 tab 不重置
+let activeSort      = 'pos';          // 'pos' | 'name-asc' | 'name-desc' | 'no-asc' | 'no-desc'
 let searchQuery     = '';
 let commentTimer    = null;
 let noteTimer       = null;
@@ -942,8 +943,23 @@ function renderFilter() {
           <div class="fc fc-all ${activeSetFilter === code ? 'active' : ''}"
             onclick="setSetFilter('${code}')">${sets[code] || code}</div>
         `).join('')}
+        <select class="sort-select" onchange="setSort(this.value)">
+          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
+          <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
+          <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
+          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
+          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
+        </select>
       </div>`
-    : '';
+    : `<div class="fc-set-row">
+        <select class="sort-select" onchange="setSort(this.value)">
+          <option value="pos"       ${activeSort==='pos'       ?'selected':''}>默认顺序</option>
+          <option value="name-asc"  ${activeSort==='name-asc'  ?'selected':''}>名称 A→Z</option>
+          <option value="name-desc" ${activeSort==='name-desc' ?'selected':''}>名称 Z→A</option>
+          <option value="no-asc"    ${activeSort==='no-asc'    ?'selected':''}>编号 小→大</option>
+          <option value="no-desc"   ${activeSort==='no-desc'   ?'selected':''}>编号 大→小</option>
+        </select>
+      </div>`;
 
   const cnt   = filteredCards().length;
   const total = tabCards.length;
@@ -961,6 +977,7 @@ function renderFilter() {
 
 function setFilter(f)    { activeFilter = f;    renderFilter(); renderCards(); }
 function setSetFilter(s) { activeSetFilter = s; renderFilter(); renderCards(); }
+function setSort(s)      { activeSort = s;      renderFilter(); renderCards(); }
 
 function onSearch(v) {
   searchQuery = v.trim(); renderCards();
@@ -981,6 +998,17 @@ function filteredCards() {
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     list = list.filter(c => c.name.toLowerCase().includes(q));
+  }
+  // 排序
+  if (activeSort !== 'pos') {
+    list = [...list];
+    if (activeSort === 'name-asc')  list.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+    if (activeSort === 'name-desc') list.sort((a, b) => b.name.localeCompare(a.name, 'zh'));
+    if (activeSort === 'no-asc' || activeSort === 'no-desc') {
+      // 从 cardNo 中提取序号数字（UNL-001/219 → 1）
+      const num = c => parseInt(c.cardNo?.match(/\d+/)?.[0] ?? '0', 10);
+      list.sort((a, b) => activeSort === 'no-asc' ? num(a) - num(b) : num(b) - num(a));
+    }
   }
   return list;
 }
