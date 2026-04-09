@@ -354,9 +354,11 @@ async function refreshSession(refreshToken) {
     });
     if (!r.ok) { clearSession(); return false; }
     const data = await r.json();
+    // 保留当前的 display_name,因为它来自 profiles 表,是权威来源
     const knownName = currentUser?.display_name || null;
     applySession(data);
-    if (knownName && !data.user?.user_metadata?.display_name) {
+    // 强制使用已知的昵称,覆盖 user_metadata 中可能的旧值
+    if (knownName) {
       currentUser.display_name = knownName;
       data.user.user_metadata = { ...data.user.user_metadata, display_name: knownName };
     }
@@ -378,6 +380,8 @@ async function boot() {
   showSkeleton();
   try {
     await loadAll();
+    // loadAll 已经从 profiles 表更新了 currentUser.display_name
+    document.getElementById('userPillName').textContent = currentUser.display_name;
     subscribeRealtime();
   } catch(e) {
     console.error('boot error', e);
@@ -453,9 +457,10 @@ function collectUsers(gradeRows, noteRows, profileRows) {
     id,
     display_name: profileMap[id] || (id === currentUser.id ? currentUser.display_name : id.slice(0, 6)),
   }));
+  // profiles 表是昵称的唯一权威来源
   if (profileMap[currentUser.id]) {
     currentUser.display_name = profileMap[currentUser.id];
-    document.getElementById('userPillName').textContent = currentUser.display_name;
+    // 同步更新 localStorage 中的 session,防止刷新时被旧值覆盖
     try {
       const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
       if (saved.user) {
@@ -480,6 +485,8 @@ function subscribeRealtime() {
   ch.on('postgres_changes', { event:'*', schema:'public', table:'cards' },       p => handleCardsEvent(p));
   ch.on('postgres_changes', { event:'*', schema:'public', table:'card_grades' }, p => handleGradesEvent(p));
   ch.on('postgres_changes', { event:'*', schema:'public', table:'card_notes' },  p => handleNotesEvent(p));
+  ch.on('postgres_changes', { event:'*', schema:'public', table:'sets' },        p => handleSetsEvent(p));
+  ch.on('postgres_changes', { event:'*', schema:'public', table:'profiles' },    p => handleProfilesEvent(p));
   ch.subscribe(status => {
     if (status === 'SUBSCRIBED') {
       setSyncState('live', '实时同步'); realtimeChannel = ch;
@@ -529,8 +536,18 @@ function handleGradesEvent({ eventType, new: n, old: o }) {
     if (!grades[n.card_id]) grades[n.card_id] = {};
     if (!grades[n.card_id][n.user_id]) grades[n.card_id][n.user_id] = {};
     grades[n.card_id][n.user_id][n.format] = { grade: n.grade || null, comment: n.comment || '' };
-    if (!allUsers.find(u => u.id === n.user_id))
-      allUsers.push({ id: n.user_id, display_name: n.user_id.slice(0, 6) });
+    // 新用户出现时,尝试从 profiles 表获取真实昵称
+    if (!allUsers.find(u => u.id === n.user_id)) {
+      sbFetch(`profiles?id=eq.${encodeURIComponent(n.user_id)}&select=display_name`)
+        .then(rows => {
+          const displayName = rows?.[0]?.display_name || n.user_id.slice(0, 6);
+          allUsers.push({ id: n.user_id, display_name: displayName });
+          patchCardDom(); // 更新显示
+        })
+        .catch(() => {
+          allUsers.push({ id: n.user_id, display_name: n.user_id.slice(0, 6) });
+        });
+    }
   }
   patchCardDom(); renderTabs(); renderStats(); renderProgress();
   setSyncState('live', '实时同步');
@@ -543,6 +560,50 @@ function handleNotesEvent({ eventType, new: n, old: o }) {
     if (!notes[n.card_id]) notes[n.card_id] = {};
     notes[n.card_id][n.user_id] = { note: n.note || '' };
   }
+  patchCardDom();
+  setSyncState('live', '实时同步');
+}
+
+function handleSetsEvent({ eventType, new: n, old: o }) {
+  if (eventType === 'DELETE') {
+    delete sets[o.code];
+  } else {
+    // INSERT or UPDATE
+    sets[n.code] = { name: n.name, sortOrder: n.sort_order ?? 0 };
+  }
+  // 系列信息变化可能影响筛选行和卡片显示
+  renderFilter(); renderCards();
+  setSyncState('live', '实时同步');
+}
+
+function handleProfilesEvent({ eventType, new: n, old: o }) {
+  if (eventType === 'DELETE') {
+    // 用户被删除时,从 allUsers 中移除
+    const idx = allUsers.findIndex(u => u.id === o.id);
+    if (idx >= 0) allUsers.splice(idx, 1);
+  } else {
+    // INSERT or UPDATE
+    const user = allUsers.find(u => u.id === n.id);
+    if (user) {
+      user.display_name = n.display_name;
+    } else {
+      allUsers.push({ id: n.id, display_name: n.display_name });
+    }
+    // 如果是当前用户的昵称更新
+    if (n.id === currentUser.id) {
+      currentUser.display_name = n.display_name;
+      document.getElementById('userPillName').textContent = n.display_name;
+      // 同步到 localStorage
+      try {
+        const saved = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
+        if (saved.user) {
+          saved.user.user_metadata = { ...saved.user.user_metadata, display_name: n.display_name };
+          localStorage.setItem(SESSION_KEY, JSON.stringify(saved));
+        }
+      } catch {}
+    }
+  }
+  // 昵称变化需要更新卡片上的 peer badges
   patchCardDom();
   setSyncState('live', '实时同步');
 }
