@@ -328,26 +328,33 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   background-size:200% 100%;animation:shimmer 1.4s infinite;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-/* ── Lightbox ── */
+/* ═══════════════════════════════════════════════════════════
+   LIGHTBOX
+═══════════════════════════════════════════════════════════ */
 .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:400;
   align-items:center;justify-content:center;backdrop-filter:blur(6px);cursor:zoom-out;}
 .lightbox.open{display:flex;}
 .lb-inner{position:relative;max-width:min(480px,90vw);display:flex;flex-direction:column;align-items:center;gap:12px;}
+/* 战场卡横版需要更宽的容器（宽度 = 普通卡高度） */
+.lb-inner.is-bf{max-width:min(672px,90vw);}
+/* 普通卡图片 */
 .lb-img{width:100%;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.8);display:block;}
-/* 战场牌 wrapper：横版容器，比普通卡宽，高度较小（7:5 比例） */
-.lb-bf-wrap{width:100%;}
-/* 图片 7:5 横版，rotate(-90deg) 后视觉变为 5:7 竖版，与普通卡等大 */
-.lb-img--rotated{
-  width:100%;aspect-ratio:7/5;display:block;
-  transform:rotate(-90deg);
-  border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.8);
-}
+/* 战场卡外壳：7:5 横版，尺寸与普通卡宽高对调 */
+.lb-bf-wrap{width:100%;aspect-ratio:7/5;position:relative;
+  border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.8);overflow:hidden;}
+/* 源图 5:7 竖版绝对居中后旋转 -90°，正好填满外壳 */
+.lb-img--rotated{position:absolute;top:50%;left:50%;
+  width:calc(100% * 5 / 7);aspect-ratio:5/7;
+  transform:translate(-50%,-50%) rotate(-90deg);display:block;}
+/* 占位符 */
 .lb-ph{width:100%;aspect-ratio:5/7;border-radius:12px;background:var(--bg-card);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-dim);}
 .lb-ph-ico{font-size:56px;opacity:.15;}
+/* 卡名与 meta */
 .lb-name{font-family:'Cinzel',serif;font-size:15px;color:var(--gold-light);letter-spacing:.1em;text-align:center;}
 .lb-meta{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;}
 .lb-meta .ci-tag{font-size:11px;padding:3px 8px;}
+/* 关闭按钮 */
 .lb-close{position:absolute;top:-16px;right:-16px;width:32px;height:32px;background:var(--bg-panel);
   border:1px solid var(--border-hi);border-radius:50%;color:var(--text-mid);font-size:16px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
