@@ -264,8 +264,9 @@ async function doLogin() {
     showMainScreen();
     setSyncState('syncing', '连接中…');
     showSkeleton();
-    sbUpsert('profiles', { id: currentUser.id, display_name: currentUser.display_name }).catch(() => {});
     await loadAll();
+    // loadAll → collectUsers 已从 profiles 表写入正确昵称，再确保新用户有初始记录
+    ensureProfile();
     subscribeRealtime();
   } catch(e) { errEl.textContent = e.message; }
   btn.classList.remove('loading'); btn.textContent = '登录';
@@ -290,6 +291,16 @@ async function doLogout() {
   showAuthScreen();
   document.getElementById('authPassword').value = '';
   document.getElementById('authErr').textContent = '';
+}
+
+// 仅在 profiles 表没有此用户记录时才插入初始昵称，已有记录一律不覆盖
+async function ensureProfile() {
+  try {
+    const rows = await sbFetch(`profiles?id=eq.${currentUser.id}&select=id`);
+    if (!rows || rows.length === 0) {
+      await sbUpsert('profiles', { id: currentUser.id, display_name: currentUser.display_name });
+    }
+  } catch {}
 }
 
 async function editDisplayName() {
