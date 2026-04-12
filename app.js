@@ -265,7 +265,9 @@ async function doLogin() {
     setSyncState('syncing', '连接中…');
     showSkeleton();
     await loadAll();
-    // loadAll → collectUsers 已从 profiles 表写入正确昵称，再确保新用户有初始记录
+    // loadAll → collectUsers 已从 profiles 表写入正确昵称，同步更新 pill 显示
+    document.getElementById('userPillName').textContent = currentUser.display_name;
+    // 再确保新用户有初始记录
     ensureProfile();
     subscribeRealtime();
   } catch(e) { errEl.textContent = e.message; }
